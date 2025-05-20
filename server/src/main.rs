@@ -5,11 +5,25 @@ use socketioxide::{
 };
 
 async fn on_connect(socket: SocketRef, Data(data): Data<serde_json::Value>) {
-    socket.emit("auth", &data).ok();
+    socket.on(
+        "event",
+        async |socket: SocketRef, Data::<serde_json::Value>(data)| {
+            let event = serde_json::from_value::<netcode::Event>(data);
 
-    socket.on("message", async |socket: SocketRef, Data::<serde_json::Value>(data)| {
-        socket.emit("message-back", &data).ok();
-    });
+            let event = match event {
+                Ok(e) => e,
+                Err(err) => {
+                    socket.emit(
+                        "error",
+                        &format!("Error while parsing event payload: {}", err),
+                    );
+                    return;
+                }
+            };
+
+            // socket.emit("message-back", &data).ok();
+        },
+    );
 
     socket.on(
         "message-with-ack",
