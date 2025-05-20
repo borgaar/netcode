@@ -48,7 +48,7 @@ async fn on_connect(
                         let players = &mut socket_state.lock().unwrap().players;
                         let player_id = players.len();
                         players.push(netcode::Player::new(player_id));
-                        let response = serde_json::to_string(&JoinResponse::new(player_id));
+                        let response = serde_json::to_string(&JoinResponse::new(player_id)).unwrap();
                         socket.emit(JOIN_CHANNEL, &response);
                     }
                 };
