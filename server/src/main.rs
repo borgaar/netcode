@@ -4,6 +4,7 @@ use std::{
 };
 
 use axum::routing::get;
+use netcode::{ERROR_CHANNEL, EVENT_CHANNEL, STATE_CHANNEL};
 use socketioxide::{
     extract::{AckSender, Data, SocketRef, State},
     SocketIo,
@@ -18,7 +19,7 @@ async fn on_connect(
 
     let socket_state = state.clone();
     socket.on(
-        "event",
+EVENT_CHANNEL,
         async move |socket: SocketRef, Data::<serde_json::Value>(data)| {
             let event = serde_json::from_value::<netcode::Event>(data);
 
@@ -26,7 +27,7 @@ async fn on_connect(
                 Ok(e) => e,
                 Err(err) => {
                     socket.emit(
-                        "error",
+ERROR_CHANNEL,
                         &format!("Error while parsing event payload: {}", err),
                     );
                     return;
@@ -34,18 +35,24 @@ async fn on_connect(
             };
 
             {
-                let player = &mut socket_state.lock().unwrap().players[event.player_id];
-
                 match event.variant {
                     netcode::event::Variant::Jump(jump) => {
+                        let player = &mut socket_state.lock().unwrap().players[event.player_id];
                         player.last_jump_at = jump.at;
                     }
-                    netcode::event::Variant::Movement(movement) => player.x += movement,
+                    netcode::event::Variant::Movement(movement) => {
+                        let player = &mut socket_state.lock().unwrap().players[event.player_id];
+                        player.x += movement
+                    }
+                    netcode::event::Variant::Register => {
+                        let players = &mut socket_state.lock().unwrap().players;
+                        players.push(netcode::Player::new(players.len()));
+                    }
                 };
             }
 
             let response = serde_json::to_string(socket_state.as_ref()).unwrap();
-            socket.emit("state", &response).unwrap();
+            socket.emit(STATE_CHANNEL, &response).unwrap();
         },
     );
 
@@ -56,9 +63,9 @@ async fn on_connect(
             {
                 let state = state.lock().unwrap();
                 let message = serde_json::to_string(&*state).unwrap();
-                socket.emit("state", &message);
+                socket.emit(STATE_CHANNEL, &message);
             }
-            
+
             tokio::time::sleep(Duration::from_millis(300)).await
         }
     });
