@@ -7,7 +7,7 @@ pub mod server;
 pub use event::Action;
 use serde::{Deserialize, Serialize};
 
-pub const ACTION_CHANNEL: &str = "event";
+pub const ACTION_CHANNEL: &str = "action";
 pub const STATE_CHANNEL: &str = "state";
 pub const JOIN_CHANNEL: &str = "join";
 pub const ERROR_CHANNEL: &str = "error";

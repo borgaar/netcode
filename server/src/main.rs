@@ -34,25 +34,23 @@ async fn on_connect(
                 }
             };
 
-            {
-                match event.variant {
-                    netcode::event::Variant::Jump(jump) => {
-                        let player = &mut socket_state.lock().unwrap().players[event.player_id];
-                        player.last_jump_at = jump.at;
-                    }
-                    netcode::event::Variant::Movement(movement) => {
-                        let player = &mut socket_state.lock().unwrap().players[event.player_id];
-                        player.x += movement
-                    }
-                    netcode::event::Variant::Join => {
-                        let players = &mut socket_state.lock().unwrap().players;
-                        let player_id = players.len();
-                        players.push(netcode::Player::new(player_id));
-                        let response = serde_json::to_string(&JoinResponse::new(player_id)).unwrap();
-                        socket.emit(JOIN_CHANNEL, &response);
-                    }
-                };
-            }
+            match event.variant {
+                netcode::event::Variant::Jump(jump) => {
+                    let player = &mut socket_state.lock().unwrap().players[event.player_id];
+                    player.last_jump_at = jump.at;
+                }
+                netcode::event::Variant::Movement(movement) => {
+                    let player = &mut socket_state.lock().unwrap().players[event.player_id];
+                    player.x += movement
+                }
+                netcode::event::Variant::Join => {
+                    let players = &mut socket_state.lock().unwrap().players;
+                    let player_id = players.len();
+                    players.push(netcode::Player::new(player_id));
+                    let response = serde_json::to_string(&JoinResponse::new(player_id)).unwrap();
+                    socket.emit(JOIN_CHANNEL, &response);
+                }
+            };
         },
     );
 
@@ -77,7 +75,7 @@ struct AppState {
 }
 
 #[tokio::main]
-async fn main() -> Result<(), Box<dyn std::error::Error>> {
+async fn main() -> anyhow::Result<()> {
     let state = AppState::default();
 
     let (layer, io) = SocketIo::builder().with_state(state).build_layer();

@@ -29,3 +29,16 @@ impl JoinResponse {
         Self { player_id }
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    
+    #[test]
+    fn serialization() {
+        let payload = Action { player_id: 1, variant: Variant::Movement(3.4) };
+        
+        println!("{}", serde_json::to_string_pretty(&payload).unwrap());
+        panic!()
+    }
+}
