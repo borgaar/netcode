@@ -1,5 +1,5 @@
 use axum::routing::get;
-use netcode::{ACTION_CHANNEL, ERROR_CHANNEL, JOIN_CHANNEL, STATE_CHANNEL};
+use netcode::{event::JoinResponse, ACTION_CHANNEL, ERROR_CHANNEL, JOIN_CHANNEL, STATE_CHANNEL};
 use serde_json::json;
 use socketioxide::{
     extract::{AckSender, Data, SocketRef, State},
@@ -48,13 +48,11 @@ async fn on_connect(
                         let players = &mut socket_state.lock().unwrap().players;
                         let player_id = players.len();
                         players.push(netcode::Player::new(player_id));
-                        socket.emit(JOIN_CHANNEL, &json!({ "player_id": player_id }));
+                        let response = serde_json::to_string(&JoinResponse::new(player_id));
+                        socket.emit(JOIN_CHANNEL, &response);
                     }
                 };
             }
-
-            let response = serde_json::to_string(socket_state.as_ref()).unwrap();
-            socket.emit(STATE_CHANNEL, &response).unwrap();
         },
     );
 
