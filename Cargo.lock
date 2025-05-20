@@ -1140,6 +1140,7 @@ dependencies = [
  "macroquad",
  "rust_socketio",
  "serde",
+ "serde_json",
 ]
 
 [[package]]

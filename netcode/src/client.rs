@@ -1,9 +1,11 @@
+use chrono::DateTime;
 use rust_socketio::{client::Client, ClientBuilder, Payload, RawClient};
+use serde_json::json;
 
-use crate::State;
+use crate::{Player, State};
 
 pub struct NetcodeClient {
-    socket: RawClient,
+    socket: Client,
     pub state: State,
 }
 
@@ -14,24 +16,31 @@ impl NetcodeClient {
                 players: vec![Player {
                     id: 0,
                     x: 0.0,
-                    last_jump_at: Utc::now(),
+                    last_jump_at: DateTime::default(),
                 }],
             },
-            socket: ClientBuilder::new("http://localhost:7878")
-                .namespace("/")
-                .on("test", |payload, socket| {
-                    match payload {
-                        Payload::Text(str) => println!("Received: {:?}", str),
-                        Payload::Binary(bin_data) => println!("Received bytes: {:#?}", bin_data),
-                        _ => println!("Received unknown payload"),
-                    }
-                    socket
-                        .emit("test", json!({"got ack": true}))
-                        .expect("Server unreachable")
-                })
-                .on("error", |err, _| eprintln!("Error: {:#?}", err))
-                .connect()
-                .expect("Connection failed"),
+            socket: ClientBuilder::new(format!(
+                "http://{}:{}/",
+                addr.iter()
+                    .map(|b| b.to_string())
+                    .collect::<Vec<_>>()
+                    .join("."),
+                port
+            ))
+            .namespace("/")
+            .on("test", |payload, socket| {
+                match payload {
+                    Payload::Text(str) => println!("Received: {:?}", str),
+                    Payload::Binary(bin_data) => println!("Received bytes: {:#?}", bin_data),
+                    _ => println!("Received unknown payload"),
+                }
+                socket
+                    .emit("test", json!({"got ack": true}))
+                    .expect("Server unreachable")
+            })
+            .on("error", |err, _| eprintln!("Error: {:#?}", err))
+            .connect()
+            .expect("Connection failed"),
         }
     }
     pub fn register(&mut self) {
