@@ -1,13 +1,13 @@
-use std::{
-    sync::{Arc, Mutex},
-    time::Duration,
-};
-
 use axum::routing::get;
-use netcode::{ERROR_CHANNEL, EVENT_CHANNEL, STATE_CHANNEL};
+use netcode::{ACTION_CHANNEL, ERROR_CHANNEL, JOIN_CHANNEL, STATE_CHANNEL};
+use serde_json::json;
 use socketioxide::{
     extract::{AckSender, Data, SocketRef, State},
     SocketIo,
+};
+use std::{
+    sync::{Arc, Mutex},
+    time::Duration,
 };
 
 async fn on_connect(
@@ -19,15 +19,15 @@ async fn on_connect(
 
     let socket_state = state.clone();
     socket.on(
-EVENT_CHANNEL,
+        ACTION_CHANNEL,
         async move |socket: SocketRef, Data::<serde_json::Value>(data)| {
-            let event = serde_json::from_value::<netcode::Event>(data);
+            let event = serde_json::from_value::<netcode::Action>(data);
 
             let event = match event {
                 Ok(e) => e,
                 Err(err) => {
                     socket.emit(
-ERROR_CHANNEL,
+                        ERROR_CHANNEL,
                         &format!("Error while parsing event payload: {}", err),
                     );
                     return;
@@ -44,9 +44,11 @@ ERROR_CHANNEL,
                         let player = &mut socket_state.lock().unwrap().players[event.player_id];
                         player.x += movement
                     }
-                    netcode::event::Variant::Register => {
+                    netcode::event::Variant::Join => {
                         let players = &mut socket_state.lock().unwrap().players;
-                        players.push(netcode::Player::new(players.len()));
+                        let player_id = players.len();
+                        players.push(netcode::Player::new(player_id));
+                        socket.emit(JOIN_CHANNEL, &json!({ "player_id": player_id }));
                     }
                 };
             }
