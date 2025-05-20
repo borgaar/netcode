@@ -1,4 +1,4 @@
-use std::collections::HashSet;
+use std::{collections::HashSet, time::Duration};
 
 use chrono::Utc;
 use macroquad::{
@@ -7,7 +7,9 @@ use macroquad::{
     shapes::draw_rectangle,
     window::{next_frame, screen_height, screen_width},
 };
-use netcode::{Player, State};
+use netcode::{client::NetcodeClient, Player, State};
+use rust_socketio::{ClientBuilder, Payload, RawClient};
+use serde_json::json;
 
 const PLAYER_SIZE: f32 = 30.;
 const PLAYER_SPEED: f32 = 3.;
@@ -23,6 +25,8 @@ async fn main() -> anyhow::Result<()> {
             last_jump_at: Utc::now(),
         }],
     };
+
+    let client = NetcodeClient::new([0, 0, 0, 0], 7878);
 
     loop {
         draw_ground();
