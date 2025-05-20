@@ -288,7 +288,9 @@ name = "client"
 version = "0.1.0"
 dependencies = [
  "anyhow",
+ "chrono",
  "macroquad",
+ "netcode",
  "rust_socketio",
  "serde",
  "serde_json",
