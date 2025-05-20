@@ -1,16 +1,18 @@
+use std::collections::HashSet;
+
 use chrono::Utc;
 use macroquad::{
-    color::{BLACK, BLUE, GREEN},
-    input::{get_keys_down, KeyCode},
-    shapes::{draw_line, draw_rectangle},
-    window::{clear_background, next_frame, screen_height, screen_width},
+    color::{BLUE, GREEN},
+    input::{get_keys_down, get_keys_pressed, KeyCode},
+    shapes::draw_rectangle,
+    window::{next_frame, screen_height, screen_width},
 };
 use netcode::{Player, State};
 
-const GROUND_THICKNESS: f32 = 10.;
 const PLAYER_SIZE: f32 = 30.;
 const PLAYER_SPEED: f32 = 3.;
-const GROUND_POSITION: f32 = 0.8;
+const GROUND_HEIGHT: f32 = 0.8;
+const JUMP_MULTIPLIER: f32 = 100.;
 
 #[macroquad::main("BasicShapes")]
 async fn main() -> anyhow::Result<()> {
@@ -23,34 +25,65 @@ async fn main() -> anyhow::Result<()> {
     };
 
     loop {
-        clear_background(BLACK);
+        draw_ground();
 
-        draw_line(
-            0.,
-            screen_height() * GROUND_POSITION,
-            screen_width(),
-            screen_height() * GROUND_POSITION,
-            GROUND_THICKNESS,
-            BLUE,
-        );
+        draw_players(&mut state);
 
-        let keys_down = get_keys_down();
-        if keys_down.iter().any(|key_code| key_code == &KeyCode::D) {
-            state.players[0].x += PLAYER_SPEED;
-        } else if keys_down.iter().any(|key_code| key_code == &KeyCode::A) {
-            state.players[0].x -= PLAYER_SPEED;
-        }
-
-        for player in &state.players {
-            draw_rectangle(
-                player.x,
-                (screen_height() * GROUND_POSITION) - (GROUND_THICKNESS / 2.) - PLAYER_SIZE,
-                PLAYER_SIZE,
-                PLAYER_SIZE,
-                GREEN,
-            );
-        }
+        handle_keys(&mut state);
 
         next_frame().await
     }
+}
+
+fn handle_key_press(key_codes: HashSet<KeyCode>, state: &mut State) {
+    for key in key_codes {
+        match key {
+            KeyCode::W => {
+                if state.players[0].y() == 0. {
+                    state.players[0].last_jump_at = Utc::now();
+                }
+            }
+            _ => {}
+        }
+    }
+}
+
+fn handle_keys(state: &mut State) {
+    let keys_down = get_keys_down();
+    handle_key_hold(keys_down, state);
+
+    let keys_pressed = get_keys_pressed();
+    handle_key_press(keys_pressed, state);
+}
+
+fn handle_key_hold(key_codes: HashSet<KeyCode>, state: &mut State) {
+    for key in key_codes {
+        match key {
+            KeyCode::D => state.players[0].x += PLAYER_SPEED,
+            KeyCode::A => state.players[0].x -= PLAYER_SPEED,
+            _ => {}
+        }
+    }
+}
+
+fn draw_players(state: &mut State) {
+    for player in &state.players {
+        draw_rectangle(
+            player.x,
+            (screen_height() * GROUND_HEIGHT) - PLAYER_SIZE - (player.y() as f32 * JUMP_MULTIPLIER),
+            PLAYER_SIZE,
+            PLAYER_SIZE,
+            GREEN,
+        );
+    }
+}
+
+fn draw_ground() {
+    draw_rectangle(
+        0.,
+        screen_height() * GROUND_HEIGHT,
+        screen_width(),
+        screen_height(),
+        BLUE,
+    );
 }
