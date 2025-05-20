@@ -17,13 +17,13 @@ pub struct Player {
 }
 
 impl Player {
-    fn y(&self) -> f32 {
+    fn y(&self) -> f64 {
         let t = (chrono::Utc::now() - self.last_jump_at).as_seconds_f64();
         
         if t < 0.0 || t > 1.0 {
             0.0
         } else {
-            -(3 * t).powi(2) + 3 * t
+            -(3.0 * t).powi(2) + 3.0 * t
         }
     }
 }
