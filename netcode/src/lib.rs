@@ -7,19 +7,19 @@ pub mod event;
 pub mod server;
 
 pub struct State {
-    players: Vec<Player>,
+    pub players: Vec<Player>,
 }
 
 pub struct Player {
-    id: Arc<String>,
-    x: f32,
-    last_jump_at: chrono::DateTime<Utc>,
+    pub id: Arc<String>,
+    pub x: f32,
+    pub last_jump_at: chrono::DateTime<Utc>,
 }
 
 impl Player {
     fn y(&self) -> f64 {
         let t = (chrono::Utc::now() - self.last_jump_at).as_seconds_f64();
-        
+
         if t < 0.0 || t > 1.0 {
             0.0
         } else {
@@ -27,3 +27,4 @@ impl Player {
         }
     }
 }
+
