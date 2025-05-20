@@ -1,27 +1,19 @@
-use std::time;
-
 use chrono::Utc;
 use serde::{Deserialize, Serialize};
 
 #[derive(Debug, Deserialize, Serialize, Clone)]
-pub enum Event {
+pub struct Event {
+    pub player_id: usize,
+    pub variant: Variant
+}
+
+#[derive(Debug, Deserialize, Serialize, Clone)]
+pub enum Variant {
     Jump(JumpEvent),
-    Movement(MovementEvent)
+    Movement(f64)
 }
 
 #[derive(Debug, Deserialize, Serialize, Clone)]
 pub struct JumpEvent {
-    at: chrono::DateTime<Utc>,
-}
-
-#[derive(Debug, Deserialize, Serialize, Clone)]
-pub struct MovementEvent {
-    direction: Direction,
-    amount: f64,
-}
-
-#[derive(Debug, Deserialize, Serialize, Clone)]
-pub enum Direction {
-    Left,
-    Right,
+    pub at: chrono::DateTime<Utc>,
 }

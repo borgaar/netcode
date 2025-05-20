@@ -9,11 +9,11 @@ use socketioxide::{
 async fn on_connect(
     socket: SocketRef,
     Data(data): Data<serde_json::Value>,
-    State(state): State<netcode::State>,
+    State(state): State<AppState>,
 ) {
     socket.on(
         "event",
-        async |socket: SocketRef, Data::<serde_json::Value>(data)| {
+        async move |socket: SocketRef, Data::<serde_json::Value>(data)| {
             let event = serde_json::from_value::<netcode::Event>(data);
 
             let event = match event {
@@ -27,34 +27,35 @@ async fn on_connect(
                 }
             };
 
-            match event {
-                netcode::Event::Jump(jump) => {},
-                netcode::Event::Movement(movement) => {}
-            };
+            {
+                let player = &mut state.state.lock().unwrap().players[event.player_id];
 
-            // socket.emit("message-back", &data).ok();
-        },
-    );
-
-    socket.on(
-        "message-with-ack",
-        async |Data::<serde_json::Value>(data), ack: AckSender| {
-            ack.send(&data).ok();
+                match event.variant {
+                    netcode::event::Variant::Jump(jump) => {
+                        player.last_jump_at = jump.at;
+                    }
+                    netcode::event::Variant::Movement(movement) => player.x += movement,
+                };
+            }
+            
+            let response = serde_json::to_string(state.state.as_ref()).unwrap();
+            socket.emit("state", &response).unwrap();
         },
     );
 }
 
 #[derive(Debug, Clone, Default)]
 struct AppState {
-    state: Arc<Mutex<netcode::State>>
+    state: Arc<Mutex<netcode::State>>,
 }
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
-    let (layer, io) = SocketIo::builder().with_state(AppState::default()).build_layer();
+    let (layer, io) = SocketIo::builder()
+        .with_state(AppState::default())
+        .build_layer();
     io.ns("/", on_connect);
-    
-    
+
     let app = axum::Router::new().layer(layer);
 
     let listener = tokio::net::TcpListener::bind("0.0.0.0:7878").await.unwrap();

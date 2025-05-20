@@ -1,5 +1,3 @@
-use std::sync::Arc;
-
 use chrono::Utc;
 
 pub mod client;
@@ -7,16 +5,17 @@ pub mod event;
 pub mod server;
 
 pub use event::Event;
+use serde::{Deserialize, Serialize};
 
-#[derive(Debug, Clone, Default)]
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
 pub struct State {
     pub players: Vec<Player>,
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
 pub struct Player {
     pub id: usize,
-    pub x: f32,
+    pub x: f64,
     pub last_jump_at: chrono::DateTime<Utc>,
 }
 
