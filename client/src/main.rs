@@ -12,7 +12,7 @@ use netcode::{Player, State};
 const PLAYER_SIZE: f32 = 30.;
 const PLAYER_SPEED: f32 = 3.;
 const GROUND_HEIGHT: f32 = 0.8;
-const JUMP_MULTIPLIER: f32 = 100.;
+const JUMP_MULTIPLIER: f32 = 300.;
 
 #[macroquad::main("BasicShapes")]
 async fn main() -> anyhow::Result<()> {
@@ -59,8 +59,8 @@ fn handle_keys(state: &mut State) {
 fn handle_key_hold(key_codes: HashSet<KeyCode>, state: &mut State) {
     for key in key_codes {
         match key {
-            KeyCode::D => state.players[0].x += PLAYER_SPEED,
-            KeyCode::A => state.players[0].x -= PLAYER_SPEED,
+            KeyCode::D => state.players[0].x += PLAYER_SPEED as f64,
+            KeyCode::A => state.players[0].x -= PLAYER_SPEED as f64,
             _ => {}
         }
     }
@@ -69,7 +69,7 @@ fn handle_key_hold(key_codes: HashSet<KeyCode>, state: &mut State) {
 fn draw_players(state: &mut State) {
     for player in &state.players {
         draw_rectangle(
-            player.x,
+            player.x as _,
             (screen_height() * GROUND_HEIGHT) - PLAYER_SIZE - (player.y() as f32 * JUMP_MULTIPLIER),
             PLAYER_SIZE,
             PLAYER_SIZE,
