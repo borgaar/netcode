@@ -1,16 +1,29 @@
-pub mod event;
+use std::sync::Arc;
 
-pub fn add(left: u64, right: u64) -> u64 {
-    left + right
+use chrono::Utc;
+
+pub mod client;
+pub mod event;
+pub mod server;
+
+pub struct State {
+    players: Vec<Player>,
 }
 
-#[cfg(test)]
-mod tests {
-    use super::*;
+pub struct Player {
+    id: Arc<String>,
+    x: f32,
+    last_jump_at: chrono::DateTime<Utc>,
+}
 
-    #[test]
-    fn it_works() {
-        let result = add(2, 2);
-        assert_eq!(result, 4);
+impl Player {
+    fn y(&self) -> f32 {
+        let t = (chrono::Utc::now() - self.last_jump_at).as_seconds_f64();
+        
+        if t < 0.0 || t > 1.0 {
+            0.0
+        } else {
+            -(3 * t).powi(2) + 3 * t
+        }
     }
 }
