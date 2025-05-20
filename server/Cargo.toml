@@ -10,5 +10,6 @@ serde.workspace = true
 serde_json.workspace = true
 socketioxide = { version = "0.16.2", features = ["state"] }
 tokio = { version = "1.45.0", features = ["macros", "rt-multi-thread"] }
+thiserror.workspace = true
 
 netcode = { path = "../netcode" }

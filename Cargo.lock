@@ -1141,6 +1141,7 @@ dependencies = [
  "rust_socketio",
  "serde",
  "serde_json",
+ "thiserror 2.0.12",
 ]
 
 [[package]]
@@ -1704,6 +1705,7 @@ dependencies = [
  "serde",
  "serde_json",
  "socketioxide",
+ "thiserror 2.0.12",
  "tokio",
 ]
 

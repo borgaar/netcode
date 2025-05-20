@@ -10,6 +10,8 @@ use std::{
     time::Duration,
 };
 
+const STATE_UPDATE_INTERVAL: Duration = Duration::from_millis(300);
+
 async fn on_connect(
     socket: SocketRef,
     Data(data): Data<serde_json::Value>,
@@ -34,23 +36,24 @@ async fn on_connect(
                 }
             };
 
-            match event.variant {
-                netcode::event::Variant::Jump(jump) => {
-                    let player = &mut socket_state.lock().unwrap().players[event.player_id];
-                    player.last_jump_at = jump.at;
-                }
-                netcode::event::Variant::Movement(movement) => {
-                    let player = &mut socket_state.lock().unwrap().players[event.player_id];
-                    player.x += movement
-                }
-                netcode::event::Variant::Join => {
-                    let players = &mut socket_state.lock().unwrap().players;
-                    let player_id = players.len();
-                    players.push(netcode::Player::new(player_id));
-                    let response = serde_json::to_string(&JoinResponse::new(player_id)).unwrap();
-                    socket.emit(JOIN_CHANNEL, &response);
-                }
-            };
+            {
+                let mut state = socket_state.lock().unwrap();
+
+                match event.variant {
+                    netcode::event::Variant::Jump(jump) => {
+                        state.player_jump(event.player_id, jump.at).unwrap();
+                    }
+                    netcode::event::Variant::Movement(movement) => {
+                        state.player_move(event.player_id, movement);
+                    }
+                    netcode::event::Variant::Join => {
+                        let player_id = state.player_join();
+                        let response =
+                            serde_json::to_string(&JoinResponse::new(player_id)).unwrap();
+                        socket.local().emit(JOIN_CHANNEL, &response);
+                    }
+                };
+            }
         },
     );
 
@@ -61,10 +64,12 @@ async fn on_connect(
             {
                 let state = state.lock().unwrap();
                 let message = serde_json::to_string(&*state).unwrap();
-                socket.emit(STATE_CHANNEL, &message);
+
+                // Ignore error since we can just wait for the next state broadcast
+                let _ = socket.emit(STATE_CHANNEL, &message);
             }
 
-            tokio::time::sleep(Duration::from_millis(300)).await
+            tokio::time::sleep(STATE_UPDATE_INTERVAL).await
         }
     });
 }
