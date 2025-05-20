@@ -1,10 +1,16 @@
+use std::sync::{Arc, Mutex};
+
 use axum::routing::get;
 use socketioxide::{
-    extract::{AckSender, Data, SocketRef},
+    extract::{AckSender, Data, SocketRef, State},
     SocketIo,
 };
 
-async fn on_connect(socket: SocketRef, Data(data): Data<serde_json::Value>) {
+async fn on_connect(
+    socket: SocketRef,
+    Data(data): Data<serde_json::Value>,
+    State(state): State<netcode::State>,
+) {
     socket.on(
         "event",
         async |socket: SocketRef, Data::<serde_json::Value>(data)| {
@@ -21,6 +27,11 @@ async fn on_connect(socket: SocketRef, Data(data): Data<serde_json::Value>) {
                 }
             };
 
+            match event {
+                netcode::Event::Jump(jump) => {},
+                netcode::Event::Movement(movement) => {}
+            };
+
             // socket.emit("message-back", &data).ok();
         },
     );
@@ -33,12 +44,17 @@ async fn on_connect(socket: SocketRef, Data(data): Data<serde_json::Value>) {
     );
 }
 
+#[derive(Debug, Clone, Default)]
+struct AppState {
+    state: Arc<Mutex<netcode::State>>
+}
+
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
-    let (layer, io) = SocketIo::new_layer();
-
+    let (layer, io) = SocketIo::builder().with_state(AppState::default()).build_layer();
     io.ns("/", on_connect);
-
+    
+    
     let app = axum::Router::new().layer(layer);
 
     let listener = tokio::net::TcpListener::bind("0.0.0.0:7878").await.unwrap();

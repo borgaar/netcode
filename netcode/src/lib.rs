@@ -8,10 +8,12 @@ pub mod server;
 
 pub use event::Event;
 
+#[derive(Debug, Clone, Default)]
 pub struct State {
     pub players: Vec<Player>,
 }
 
+#[derive(Debug, Clone)]
 pub struct Player {
     pub id: usize,
     pub x: f32,
@@ -19,7 +21,7 @@ pub struct Player {
 }
 
 impl Player {
-    fn y(&self) -> f64 {
+    pub fn y(&self) -> f64 {
         let t = (chrono::Utc::now() - self.last_jump_at).as_seconds_f64();
 
         if t < 0.0 || t > 1.0 {

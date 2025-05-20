@@ -8,7 +8,7 @@ axum = "0.8.4"
 anyhow.workspace = true
 serde.workspace = true
 serde_json.workspace = true
-socketioxide = "0.16.2"
+socketioxide = { version = "0.16.2", features = ["state"] }
 tokio = { version = "1.45.0", features = ["macros", "rt-multi-thread"] }
 
 netcode = { path = "../netcode" }
