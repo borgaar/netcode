@@ -1,4 +1,5 @@
 // pub mod client;
+pub mod client;
 pub mod event;
 pub mod server;
 pub mod state;

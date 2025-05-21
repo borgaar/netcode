@@ -11,3 +11,4 @@ serde_json = { workspace = true }
 anyhow = {workspace = true}
 rust_socketio = "0.6.0"
 thiserror.workspace = true
+tokio = "1.45.0"

@@ -7,7 +7,7 @@ use macroquad::{
     shapes::draw_rectangle,
     window::{next_frame, screen_height, screen_width},
 };
-use netcode::{client::NetcodeClient, Player, State};
+use netcode::{client::Game, State};
 use rust_socketio::{ClientBuilder, Payload, RawClient};
 use serde_json::json;
 
@@ -18,46 +18,44 @@ const JUMP_MULTIPLIER: f32 = 300.;
 
 #[macroquad::main("BasicShapes")]
 async fn main() -> anyhow::Result<()> {
-    let mut state = State {
-        players: vec![Player {
-            id: 0,
-            x: 0.0,
-            last_jump_at: Utc::now(),
-        }],
-    };
-
-    let client = NetcodeClient::new([0, 0, 0, 0], 7878);
+    let mut game = Game::new();
 
     loop {
         draw_ground();
 
-        draw_players(&mut state);
+        draw_players(&mut game.state);
 
-        handle_keys(&mut state);
+        handle_keys(&mut game);
 
-        next_frame().await
+        game.update();
+
+        next_frame().await;
     }
 }
 
-fn handle_key_press(key_codes: HashSet<KeyCode>, state: &mut State) {
+fn handle_key_press(key_codes: HashSet<KeyCode>, game: &mut Game) {
     for key in key_codes {
         match key {
-            KeyCode::W => {
-                if state.players[0].y() == 0. {
-                    state.players[0].last_jump_at = Utc::now();
+            KeyCode::W => match game.get_own_player() {
+                Some(player) => {
+                    if player.y() == 0. {
+                        game.jump();
+                    }
                 }
-            }
+                None => {}
+            },
+            KeyCode::J => {}
             _ => {}
         }
     }
 }
 
-fn handle_keys(state: &mut State) {
+fn handle_keys(game: &mut Game) {
     let keys_down = get_keys_down();
-    handle_key_hold(keys_down, state);
+    handle_key_hold(keys_down, &mut game.state);
 
     let keys_pressed = get_keys_pressed();
-    handle_key_press(keys_pressed, state);
+    handle_key_press(keys_pressed, game);
 }
 
 fn handle_key_hold(key_codes: HashSet<KeyCode>, state: &mut State) {
