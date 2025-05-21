@@ -3,7 +3,9 @@ use std::sync::mpsc::{channel, Receiver};
 use rust_socketio::{client::Client, ClientBuilder, Payload};
 
 use crate::{
-    event::JoinResponse, state::Player, State, ACTION_CHANNEL, JOIN_CHANNEL, STATE_CHANNEL,
+    event::{JoinResponse, JumpAction, Variant},
+    state::Player,
+    Action, State, ACTION_CHANNEL, JOIN_CHANNEL, STATE_CHANNEL,
 };
 
 pub struct Game {
@@ -28,27 +30,38 @@ impl Game {
         let game = Self {
             state_receiver,
             join_receiver,
-            state: State::default(),
+            state: State { players: vec![] },
             player_id: None,
             client: ClientBuilder::new("http://0.0.0.0:7878")
                 .on(STATE_CHANNEL, move |payload, _| match payload {
                     Payload::Text(text) => {
-                        // let data = serde_json::from_str::<State>(text);
-                        // state_sender.send(data).unwrap();
+                        println!("Received state: {:?}", text);
+                        let data = serde_json::from_str::<State>(
+                            text.first().unwrap().clone().as_str().unwrap(),
+                        )
+                        .unwrap();
+                        state_sender.send(data).unwrap();
                     }
                     _ => {
                         eprintln!("Received bad payload on state");
                     }
                 })
-                .on(JOIN_CHANNEL, move |payload, _| match payload {
-                    Payload::Text(text) => {
-                        let data =
-                            serde_json::from_value::<JoinResponse>(text.first().unwrap().clone())
-                                .unwrap();
-                        join_sender.send(data).unwrap();
-                    }
-                    _ => {
-                        eprintln!("Received non-binary payload on join");
+                .on(JOIN_CHANNEL, move |payload, _| {
+                    println!("received join");
+                    match payload {
+                        Payload::Text(text) => {
+                            let data = serde_json::from_str::<JoinResponse>(
+                                text.first().unwrap().clone().as_str().unwrap(),
+                            )
+                            .unwrap();
+                            join_sender.send(data).unwrap();
+                        }
+                        _ => {
+                            eprintln!(
+                                "Received non-binary payload on join, received {:?}",
+                                payload
+                            );
+                        }
                     }
                 })
                 .connect()
@@ -57,8 +70,18 @@ impl Game {
 
         game
     }
-    pub async fn join(&self) {
-        self.client.emit(ACTION_CHANNEL, "").unwrap();
+    pub fn join(&self) {
+        println!("Joining");
+        self.client
+            .emit(
+                ACTION_CHANNEL,
+                Payload::Text(vec![serde_json::to_value(&Action {
+                    player_id: 0,
+                    variant: Variant::Join,
+                })
+                .unwrap()]),
+            )
+            .unwrap();
     }
     pub fn update(&mut self) {
         self.state_update();
@@ -69,12 +92,6 @@ impl Game {
             self.state = state;
         }
     }
-    pub fn get_own_player(&mut self) -> Option<&mut Player> {
-        self.state
-            .players
-            .iter_mut()
-            .find(|p| Some(p.id) == self.player_id)
-    }
     fn join_update(&mut self) {
         while let Ok(join_response) = self.join_receiver.try_recv() {
             self.player_id = Some(join_response.player_id);
@@ -84,8 +101,45 @@ impl Game {
         }
     }
     pub fn jump(&mut self) {
-        if let Some(player) = self.get_own_player() {
-            player.last_jump_at = Some(chrono::Utc::now());
+        if let Some(player_idx) = self
+            .state
+            .players
+            .iter()
+            .position(|p| p.id == self.player_id.unwrap())
+        {
+            self.state.players.get_mut(player_idx).unwrap().last_jump_at = Some(chrono::Utc::now());
+            self.client
+                .emit(
+                    ACTION_CHANNEL,
+                    Payload::Text(vec![serde_json::to_value(&Action {
+                        player_id: self.player_id.unwrap(),
+                        variant: Variant::Jump(JumpAction {
+                            at: chrono::Utc::now(),
+                        }),
+                    })
+                    .unwrap()]),
+                )
+                .unwrap();
+        }
+    }
+    pub fn move_player(&mut self, delta_x: f32) {
+        if let Some(player_idx) = self
+            .state
+            .players
+            .iter()
+            .position(|p| p.id == self.player_id.unwrap())
+        {
+            self.state.players.get_mut(player_idx).unwrap().x += delta_x as f64;
+            self.client
+                .emit(
+                    ACTION_CHANNEL,
+                    Payload::Text(vec![serde_json::to_value(&Action {
+                        player_id: self.player_id.unwrap(),
+                        variant: Variant::Movement(delta_x as _),
+                    })
+                    .unwrap()]),
+                )
+                .unwrap();
         }
     }
 }

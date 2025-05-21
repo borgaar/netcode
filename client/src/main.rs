@@ -1,5 +1,6 @@
-use std::collections::HashSet;
+use std::{collections::HashSet, time::Duration};
 
+use chrono::Utc;
 use macroquad::{
     color::{BLUE, GREEN},
     input::{get_keys_down, get_keys_pressed, KeyCode},
@@ -7,6 +8,8 @@ use macroquad::{
     window::{next_frame, screen_height, screen_width},
 };
 use netcode::{client::Game, State};
+use rust_socketio::{ClientBuilder, Payload, RawClient};
+use serde_json::json;
 
 const PLAYER_SIZE: f32 = 30.;
 const PLAYER_SPEED: f32 = 3.;
@@ -33,12 +36,19 @@ async fn main() -> anyhow::Result<()> {
 fn handle_key_press(key_codes: HashSet<KeyCode>, game: &mut Game) {
     for key in key_codes {
         match key {
-            KeyCode::W => if let Some(player) = game.get_own_player() {
-                if player.y() == 0. {
-                    game.jump();
+            KeyCode::W => match game.player_id {
+                Some(id) => {
+                    if let Some(player) = game.state.players.iter().find(|p| p.id == id) {
+                        if player.y() <= 0. {
+                            game.jump();
+                        }
+                    }
                 }
+                None => {}
             },
-            KeyCode::J => {}
+            KeyCode::J => {
+                game.join();
+            }
             _ => {}
         }
     }
@@ -46,17 +56,17 @@ fn handle_key_press(key_codes: HashSet<KeyCode>, game: &mut Game) {
 
 fn handle_keys(game: &mut Game) {
     let keys_down = get_keys_down();
-    handle_key_hold(keys_down, &mut game.state);
+    handle_key_hold(keys_down, game);
 
     let keys_pressed = get_keys_pressed();
     handle_key_press(keys_pressed, game);
 }
 
-fn handle_key_hold(key_codes: HashSet<KeyCode>, state: &mut State) {
+fn handle_key_hold(key_codes: HashSet<KeyCode>, game: &mut Game) {
     for key in key_codes {
         match key {
-            KeyCode::D => state.players[0].x += PLAYER_SPEED as f64,
-            KeyCode::A => state.players[0].x -= PLAYER_SPEED as f64,
+            KeyCode::D => game.move_player(PLAYER_SPEED as f32),
+            KeyCode::A => game.move_player(-PLAYER_SPEED as f32),
             _ => {}
         }
     }
