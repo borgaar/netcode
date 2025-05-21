@@ -21,7 +21,7 @@ pub enum StateError {
 }
 
 impl State {
-    fn tick(&mut self) {
+    pub fn tick(&mut self) {
         self.timestamp = Utc::now();
     }
     

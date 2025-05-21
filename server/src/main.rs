@@ -40,19 +40,19 @@ async fn on_connect(socket: SocketRef, State(state): State<AppState>) {
                         let player_id = state.player_join();
                         let response =
                             serde_json::to_string(&JoinResponse::new(player_id)).unwrap();
-                        let _ = tokio::spawn(async move {
-                            socket.local().emit(JOIN_CHANNEL, &response).await;
+                        tokio::spawn(async move {
+                            let _ = socket.local().emit(JOIN_CHANNEL, &response).await;
                         });
                     }
                     netcode::Action::Player { id, action } => match action {
                         netcode::event::PlayerAction::Leave => {
-                            try_action(state.player_leave(id));
+                            try_action(state.player_leave(id), socket);
                         }
                         netcode::event::PlayerAction::Jump { at } => {
-                            try_action(state.player_jump(id, at));
+                            try_action(state.player_jump(id, at), socket);
                         }
                         netcode::event::PlayerAction::Move { delta_x } => {
-                            try_action(state.player_move(id, delta_x));
+                            try_action(state.player_move(id, delta_x), socket);
                         }
                     },
                 }
@@ -65,7 +65,8 @@ async fn on_connect(socket: SocketRef, State(state): State<AppState>) {
         let state = &global_state;
         loop {
             {
-                let state = state.lock().unwrap();
+                let mut state = state.lock().unwrap();
+                state.tick();
                 let message = serde_json::to_string(&*state).unwrap();
 
                 // Ignore error since we can just wait for the next state broadcast
@@ -77,11 +78,11 @@ async fn on_connect(socket: SocketRef, State(state): State<AppState>) {
     });
 }
 
-fn try_action(result: Result<(), netcode::state::StateError>) {
+fn try_action(result: Result<(), netcode::state::StateError>, socket: SocketRef) {
     if let Err(e) = result {
         tokio::spawn(async move {
-            socket.emit(ERROR_CHANNEL, &e.to_string());
-        })
+            let _ = socket.local().emit(ERROR_CHANNEL, &e.to_string()).await;
+        });
     }
 }
 
