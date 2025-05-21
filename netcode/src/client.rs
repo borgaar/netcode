@@ -36,7 +36,7 @@ impl Game {
                 timestamp: Utc::now(),
             },
             player_idx: None,
-            client: ClientBuilder::new("http://0.0.0.0:7878")
+            client: ClientBuilder::new("https://f04e4c981694.ngrok.app")
                 .on(ERROR_CHANNEL, |payload, _| {
                     eprintln!("Received error: {:?}", payload);
                 })

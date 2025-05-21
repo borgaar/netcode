@@ -6,10 +6,10 @@ use macroquad::{
     shapes::draw_rectangle,
     window::{next_frame, screen_height, screen_width},
 };
-use netcode::{client::Game, State};
+use netcode::{client::Game, State, MAX_UNITS_PER_MS};
 
 const PLAYER_SIZE: f32 = 30.;
-const PLAYER_SPEED: f32 = 3.;
+const SPEED_MULTIPLIER: f32 = 1000.;
 const GROUND_HEIGHT: f32 = 0.8;
 const JUMP_MULTIPLIER: f32 = 300.;
 const PLAYER_COLORS: [Color; 5] = [RED, GREEN, BLUE, YELLOW, PURPLE];
@@ -65,8 +65,8 @@ fn handle_keys(game: &mut Game) {
 fn handle_key_hold(key_codes: HashSet<KeyCode>, game: &mut Game) {
     for key in key_codes {
         match key {
-            KeyCode::D => game.move_player(PLAYER_SPEED as f32),
-            KeyCode::A => game.move_player(-PLAYER_SPEED as f32),
+            KeyCode::D => game.move_player(MAX_UNITS_PER_MS as f32),
+            KeyCode::A => game.move_player(-MAX_UNITS_PER_MS as f32),
             _ => {}
         }
     }
@@ -75,7 +75,7 @@ fn handle_key_hold(key_codes: HashSet<KeyCode>, game: &mut Game) {
 fn draw_players(state: &mut State) {
     for (idx, player) in state.players.iter().enumerate() {
         draw_rectangle(
-            player.x as _,
+            player.x as f32 * SPEED_MULTIPLIER,
             (screen_height() * GROUND_HEIGHT) - PLAYER_SIZE - (player.y() as f32 * JUMP_MULTIPLIER),
             PLAYER_SIZE,
             PLAYER_SIZE,
