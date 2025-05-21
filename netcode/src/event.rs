@@ -21,7 +21,7 @@ pub struct JumpAction {
 
 #[derive(Debug, Deserialize, Serialize, Clone)]
 pub struct JoinResponse {
-    player_id: usize,
+    pub player_id: usize,
 }
 
 impl JoinResponse {
@@ -33,12 +33,16 @@ impl JoinResponse {
 #[cfg(test)]
 mod tests {
     use super::*;
-    
+
     #[test]
     fn serialization() {
-        let payload = Action { player_id: 1, variant: Variant::Movement(3.4) };
-        
+        let payload = Action {
+            player_id: 1,
+            variant: Variant::Movement(3.4),
+        };
+
         println!("{}", serde_json::to_string_pretty(&payload).unwrap());
         panic!()
     }
 }
+
