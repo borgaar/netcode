@@ -1,6 +1,6 @@
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
-use crate::MAX_UNITS_PER_SECOND;
+use crate::MAX_UNITS_PER_MS;
 
 
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
@@ -41,7 +41,7 @@ impl State {
         let ms_since_last_update = (Utc::now() - self.timestamp).num_milliseconds();
         let x_per_ms = delta_x / ms_since_last_update as f64;
         
-        if x_per_ms > MAX_UNITS_PER_SECOND {
+        if x_per_ms > MAX_UNITS_PER_MS {
             return Err(StateError::Cheating { units: delta_x, timeframe_ms: ms_since_last_update });
         }
         
