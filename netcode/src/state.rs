@@ -1,12 +1,11 @@
 use chrono::{DateTime, Utc};
-use serde::{Deserialize, Serialize};
+use serde::{Serialize};
 
 const MAX_UNITS_PER_SECOND: f64 = 2.5 * 1000.0;
 
 #[derive(Debug, Clone, Default, Serialize)]
 pub struct State {
     pub players: Vec<Player>,
-    #[serde(skip)]
     pub timestamp: DateTime<Utc>
 }
 
