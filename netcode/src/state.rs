@@ -1,4 +1,4 @@
-use crate::MAX_UNITS_PER_MS;
+use crate::MAX_UNITS_PER_SECOND;
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 
@@ -12,8 +12,8 @@ pub struct State {
 pub enum StateError {
     #[error("No player found with id: {0}. Total players is {1}")]
     NoPlayer(usize, usize),
-    #[error("Player moved {units} units in the last {timeframe_ms} ms. Expected at most {MAX_UNITS_PER_MS} unit/ms")]
-    Cheating { units: f64, timeframe_ms: i64 },
+    #[error("Player moved {units} units in the last {timeframe_seconds:.5} s {0:.5} unit/s. Expected at most {MAX_UNITS_PER_SECOND} unit/s", units / timeframe_seconds)]
+    Cheating { units: f64, timeframe_seconds: f64 },
 }
 
 impl State {
@@ -34,16 +34,16 @@ impl State {
     }
 
     pub fn player_move(&mut self, player_id: usize, delta_x: f64) -> Result<(), StateError> {
-        let ms_since_last_update = (Utc::now() - self.timestamp).num_milliseconds();
-        let x_per_ms = delta_x / ms_since_last_update as f64;
+        let seconds_since_last_update = (Utc::now() - self.timestamp).as_seconds_f64();
+        let x_per_second = delta_x / seconds_since_last_update as f64;
 
-        if x_per_ms.abs() > MAX_UNITS_PER_MS {
+        if x_per_second.abs() > MAX_UNITS_PER_SECOND {
             self.player(player_id)?.x +=
-                MAX_UNITS_PER_MS * if x_per_ms.is_sign_positive() { 1.0 } else { -1.0 };
+                MAX_UNITS_PER_SECOND * if x_per_second.is_sign_positive() { 1.0 } else { -1.0 };
                 
             return Err(StateError::Cheating {
                 units: delta_x,
-                timeframe_ms: ms_since_last_update,
+                timeframe_seconds: seconds_since_last_update,
             });
         }
 

@@ -12,4 +12,4 @@ pub const STATE_CHANNEL: &str = "state";
 pub const JOIN_CHANNEL: &str = "join";
 pub const ERROR_CHANNEL: &str = "error";
 
-pub const MAX_UNITS_PER_MS: f64 = 2.5 / 1000.0;
+pub const MAX_UNITS_PER_SECOND: f64 = 2.5;

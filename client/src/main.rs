@@ -6,7 +6,7 @@ use macroquad::{
     shapes::draw_rectangle,
     window::{next_frame, screen_height, screen_width},
 };
-use netcode::{client::Game, State, MAX_UNITS_PER_MS};
+use netcode::{client::Game, State, MAX_UNITS_PER_SECOND};
 
 const PLAYER_SIZE: f32 = 30.;
 const SPEED_MULTIPLIER: f32 = 1000.;
@@ -65,8 +65,8 @@ fn handle_keys(game: &mut Game) {
 fn handle_key_hold(key_codes: HashSet<KeyCode>, game: &mut Game) {
     for key in key_codes {
         match key {
-            KeyCode::D => game.move_player(MAX_UNITS_PER_MS as f32),
-            KeyCode::A => game.move_player(-MAX_UNITS_PER_MS as f32),
+            KeyCode::D => game.move_player(MAX_UNITS_PER_SECOND as f32),
+            KeyCode::A => game.move_player(-MAX_UNITS_PER_SECOND as f32),
             _ => {}
         }
     }
