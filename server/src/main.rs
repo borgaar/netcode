@@ -1,8 +1,6 @@
-use axum::routing::get;
 use netcode::{event::JoinResponse, ACTION_CHANNEL, ERROR_CHANNEL, JOIN_CHANNEL, STATE_CHANNEL};
-use serde_json::json;
 use socketioxide::{
-    extract::{AckSender, Data, SocketRef, State},
+    extract::{Data, SocketRef, State},
     SocketIo,
 };
 use std::{
@@ -12,11 +10,7 @@ use std::{
 
 const STATE_UPDATE_INTERVAL: Duration = Duration::from_millis(300);
 
-async fn on_connect(
-    socket: SocketRef,
-    Data(data): Data<serde_json::Value>,
-    State(state): State<AppState>,
-) {
+async fn on_connect(socket: SocketRef, State(state): State<AppState>) {
     let state = state.state;
 
     let socket_state = state.clone();
@@ -28,10 +22,12 @@ async fn on_connect(
             let event = match event {
                 Ok(e) => e,
                 Err(err) => {
-                    socket.emit(
-                        ERROR_CHANNEL,
-                        &format!("Error while parsing event payload: {}", err),
-                    );
+                    socket
+                        .emit(
+                            ERROR_CHANNEL,
+                            &format!("Error while parsing event payload: {}", err),
+                        )
+                        .unwrap();
                     return;
                 }
             };
@@ -44,11 +40,15 @@ async fn on_connect(
                         let player_id = state.player_join();
                         let response =
                             serde_json::to_string(&JoinResponse::new(player_id)).unwrap();
-                        socket.local().emit(JOIN_CHANNEL, &response);
+                        let _ = tokio::spawn(async move {
+                            socket.local().emit(JOIN_CHANNEL, &response).await;
+                        });
                     }
                     netcode::Action::Player { id, action } => match action {
                         netcode::event::PlayerAction::Leave => state.player_leave(id).unwrap(),
-                        netcode::event::PlayerAction::Jump { at } => state.player_jump(id, at).unwrap(),
+                        netcode::event::PlayerAction::Jump { at } => {
+                            state.player_jump(id, at).unwrap()
+                        }
                         netcode::event::PlayerAction::Move { delta_x } => {
                             state.player_move(id, delta_x).unwrap()
                         }

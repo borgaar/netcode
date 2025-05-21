@@ -1,6 +1,5 @@
-use std::{collections::HashSet, time::Duration};
+use std::collections::HashSet;
 
-use chrono::Utc;
 use macroquad::{
     color::{BLUE, GREEN},
     input::{get_keys_down, get_keys_pressed, KeyCode},
@@ -8,8 +7,6 @@ use macroquad::{
     window::{next_frame, screen_height, screen_width},
 };
 use netcode::{client::Game, State};
-use rust_socketio::{ClientBuilder, Payload, RawClient};
-use serde_json::json;
 
 const PLAYER_SIZE: f32 = 30.;
 const PLAYER_SPEED: f32 = 3.;
@@ -36,13 +33,10 @@ async fn main() -> anyhow::Result<()> {
 fn handle_key_press(key_codes: HashSet<KeyCode>, game: &mut Game) {
     for key in key_codes {
         match key {
-            KeyCode::W => match game.get_own_player() {
-                Some(player) => {
-                    if player.y() == 0. {
-                        game.jump();
-                    }
+            KeyCode::W => if let Some(player) = game.get_own_player() {
+                if player.y() == 0. {
+                    game.jump();
                 }
-                None => {}
             },
             KeyCode::J => {}
             _ => {}

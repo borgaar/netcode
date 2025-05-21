@@ -21,7 +21,7 @@ impl State {
         let len = self.players.len();
         self.players
             .get_mut(player_id)
-            .ok_or_else(|| StateError::NoPlayer(player_id, len))
+            .ok_or(StateError::NoPlayer(player_id, len))
     }
 
     pub fn player_jump(&mut self, player_id: usize, at: DateTime<Utc>) -> Result<(), StateError> {
@@ -75,7 +75,7 @@ impl Player {
 
         let t = (chrono::Utc::now() - last_jump_at).as_seconds_f64();
 
-        if t < 0.0 || t > 0.33 {
+        if !(0.0..=0.33).contains(&t) {
             0.0
         } else {
             -(3.0 * t).powi(2) + 3.0 * t
