@@ -1,20 +1,18 @@
-use std::{collections::HashSet, time::Duration};
+use std::collections::HashSet;
 
-use chrono::Utc;
 use macroquad::{
-    color::{BLUE, GREEN},
+    color::{Color, BLUE, GREEN, PURPLE, RED, YELLOW},
     input::{get_keys_down, get_keys_pressed, KeyCode},
     shapes::draw_rectangle,
     window::{next_frame, screen_height, screen_width},
 };
 use netcode::{client::Game, State};
-use rust_socketio::{ClientBuilder, Payload, RawClient};
-use serde_json::json;
 
 const PLAYER_SIZE: f32 = 30.;
 const PLAYER_SPEED: f32 = 3.;
 const GROUND_HEIGHT: f32 = 0.8;
 const JUMP_MULTIPLIER: f32 = 300.;
+const PLAYER_COLORS: [Color; 5] = [RED, GREEN, BLUE, YELLOW, PURPLE];
 
 #[macroquad::main("BasicShapes")]
 async fn main() -> anyhow::Result<()> {
@@ -47,7 +45,9 @@ fn handle_key_press(key_codes: HashSet<KeyCode>, game: &mut Game) {
                 None => {}
             },
             KeyCode::J => {
-                game.join();
+                if let None = game.player_id {
+                    game.join();
+                }
             }
             _ => {}
         }
@@ -73,13 +73,13 @@ fn handle_key_hold(key_codes: HashSet<KeyCode>, game: &mut Game) {
 }
 
 fn draw_players(state: &mut State) {
-    for player in &state.players {
+    for (idx, player) in state.players.iter().enumerate() {
         draw_rectangle(
             player.x as _,
             (screen_height() * GROUND_HEIGHT) - PLAYER_SIZE - (player.y() as f32 * JUMP_MULTIPLIER),
             PLAYER_SIZE,
             PLAYER_SIZE,
-            GREEN,
+            PLAYER_COLORS[idx % PLAYER_COLORS.len()],
         );
     }
 }
