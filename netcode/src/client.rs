@@ -31,10 +31,7 @@ impl Game {
         let game = Self {
             state_receiver,
             join_receiver,
-            state: State {
-                players: vec![],
-                timestamp: Utc::now(),
-            },
+            state: Default::default(),
             player_idx: None,
             client: ClientBuilder::new("http://localhost:7878")
                 .on(ERROR_CHANNEL, |payload, _| {
@@ -98,14 +95,13 @@ impl Game {
         while let Ok(join_response) = self.join_receiver.try_recv() {
             self.player_idx = Some(join_response.player_id);
             self.state
-                .players
-                .push(Player::new(join_response.player_id));
+                .players.insert(join_response.player_id, Player::new(join_response.player_id));
         }
     }
     pub fn jump(&mut self) {
         if let Some(player_idx) = self.player_idx {
             // Optimistic update
-            self.state.players.get_mut(player_idx).unwrap().last_jump_at = Some(chrono::Utc::now());
+            self.state.players.get_mut(&player_idx).unwrap().last_jump_at = Some(chrono::Utc::now());
 
             // Send the jump action
             self.client
@@ -123,7 +119,7 @@ impl Game {
     pub fn move_player(&mut self, delta_x: f32) {
         if let Some(player_idx) = self.player_idx {
             // Optimistic update
-            self.state.players.get_mut(player_idx).unwrap().x += delta_x as f64;
+            self.state.players.get_mut(&player_idx).unwrap().x += delta_x as f64;
 
             // Send the move action
             self.client

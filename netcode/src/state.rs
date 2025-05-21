@@ -1,18 +1,32 @@
+use std::collections::HashMap;
+
 use crate::MAX_UNITS_PER_SECOND;
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 
-#[derive(Debug, Clone, Default, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct State {
-    pub players: Vec<Player>,
+    pub players: HashMap<usize,Player>,
     pub timestamp: DateTime<Utc>,
+    #[serde(skip)]
+    new_player_id: usize
+}
+
+impl Default for State {
+    fn default() -> Self {
+        Self {
+            players: HashMap::new(),
+            timestamp: Utc::now(),
+            new_player_id: 0
+        }
+    }
 }
 
 #[derive(thiserror::Error, Debug)]
 pub enum StateError {
-    #[error("[ERROR - UNKNOWN PLAYER] No player found with id: {0}. Total players is {1}")]
-    UnknownPlayer(usize, usize),
-    #[error("[ERROR - CHEATING] Player moved {units} units in the last {timeframe_seconds:.5} s {0:.5} unit/s. Expected at most {MAX_UNITS_PER_SECOND} unit/s", units / timeframe_seconds)]
+    #[error("[ERROR - UNKNOWN PLAYER] No player found with id: {0}.")]
+    UnknownPlayer(usize),
+    #[error("[ERROR - CHEATING] Player moved {units} units in the last {timeframe_seconds:.5} s ({0:.5} unit/s). Expected at most {MAX_UNITS_PER_SECOND} unit/s", units / timeframe_seconds)]
     Cheating { units: f64, timeframe_seconds: f64 },
 }
 
@@ -22,10 +36,9 @@ impl State {
     }
 
     fn player(&mut self, player_id: usize) -> Result<&mut Player, StateError> {
-        let len = self.players.len();
         self.players
-            .get_mut(player_id)
-            .ok_or(StateError::UnknownPlayer(player_id, len))
+            .get_mut(&player_id)
+            .ok_or(StateError::UnknownPlayer(player_id))
     }
 
     pub fn player_jump(&mut self, player_id: usize, at: DateTime<Utc>) -> Result<(), StateError> {
@@ -52,20 +65,18 @@ impl State {
     }
 
     pub fn player_join(&mut self) -> usize {
-        let len = self.players.len();
-        let player = Player::new(len);
-        self.players.push(player);
-        len
+        let id = self.new_player_id;
+        self.new_player_id += 1;
+        let player = Player::new(id);
+        self.players.insert(id, player);
+        id
     }
 
     pub fn player_leave(&mut self, player_id: usize) -> Result<(), StateError> {
-        let len = self.players.len();
-        if player_id >= len {
-            return Err(StateError::UnknownPlayer(player_id, len));
+        match self.players.remove(&player_id) {
+            Some(_) => Ok(()),
+            None => Err(StateError::UnknownPlayer(player_id)),
         }
-
-        self.players.remove(player_id);
-        Ok(())
     }
 }
 

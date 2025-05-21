@@ -38,7 +38,7 @@ fn handle_key_press(key_codes: HashSet<KeyCode>, game: &mut Game) {
         match key {
             KeyCode::W => match game.player_idx {
                 Some(idx) => {
-                    if let Some(player) = game.state.players.get(idx) {
+                    if let Some(player) = game.state.players.get(&idx) {
                         if player.y() <= 0. {
                             game.jump();
                         }
@@ -75,7 +75,7 @@ fn handle_key_hold(key_codes: HashSet<KeyCode>, game: &mut Game) {
 }
 
 fn draw_players(state: &mut State) {
-    for (idx, player) in state.players.iter().enumerate() {
+    for (idx, player) in state.players.iter() {
         draw_rectangle(
             player.x as f32,
             (screen_height() * GROUND_HEIGHT) - PLAYER_SIZE - (player.y() as f32 * JUMP_MULTIPLIER),
