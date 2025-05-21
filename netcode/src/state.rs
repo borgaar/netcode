@@ -1,22 +1,31 @@
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 
-const MAX_UNITS_PER_SECOND: f64 = 2.5;
+const MAX_UNITS_PER_SECOND: f64 = 2.5 * 1000.0;
 
-#[derive(Debug, Clone, Default, Serialize, Deserialize)]
+#[derive(Debug, Clone, Default, Serialize)]
 pub struct State {
     pub players: Vec<Player>,
+    #[serde(skip)]
+    pub timestamp: DateTime<Utc>
 }
 
 #[derive(thiserror::Error, Debug)]
 pub enum StateError {
     #[error("No player found with id: {0}. Total players is {1}")]
     NoPlayer(usize, usize),
-    #[error("Player moved {0} units. Expected at most {MAX_UNITS_PER_SECOND}")]
-    Cheating(f64),
+    #[error("Player moved {units} units in the last {timeframe_ms} ms. Expected at most {MAX_UNITS_PER_SECOND} unit/ms")]
+    Cheating {
+        units: f64,
+        timeframe_ms: i64
+    },
 }
 
 impl State {
+    fn tick(&mut self) {
+        self.timestamp = Utc::now();
+    }
+    
     fn player(&mut self, player_id: usize) -> Result<&mut Player, StateError> {
         let len = self.players.len();
         self.players
@@ -30,6 +39,13 @@ impl State {
     }
 
     pub fn player_move(&mut self, player_id: usize, delta_x: f64) -> Result<(), StateError> {
+        let ms_since_last_update = (Utc::now() - self.timestamp).num_milliseconds();
+        let x_per_ms = delta_x / ms_since_last_update as f64;
+        
+        if x_per_ms > MAX_UNITS_PER_SECOND {
+            return Err(StateError::Cheating { units: delta_x, timeframe_ms: ms_since_last_update });
+        }
+        
         self.player(player_id)?.x += delta_x;
         Ok(())
     }
@@ -52,7 +68,7 @@ impl State {
     }
 }
 
-#[derive(Debug, Clone, Default, Serialize, Deserialize)]
+#[derive(Debug, Clone, Default, Serialize)]
 pub struct Player {
     pub id: usize,
     pub x: f64,
