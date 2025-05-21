@@ -26,7 +26,7 @@ impl Default for State {
 pub enum StateError {
     #[error("[ERROR - UNKNOWN PLAYER] No player found with id: {0}.")]
     UnknownPlayer(usize),
-    #[error("[ERROR - CHEATING] Player moved {units} units in the last {timeframe_seconds:.5} s ({0:.5} unit/s). Expected at most {MAX_UNITS_PER_SECOND} unit/s", units / timeframe_seconds)]
+    #[error("[ERROR - CHEATING] Player moved {units:.5} units in the last {timeframe_seconds:.5} s ({0:.5} unit/s). Expected at most {MAX_UNITS_PER_SECOND} unit/s", units / timeframe_seconds)]
     Cheating { units: f64, timeframe_seconds: f64 },
 }
 
