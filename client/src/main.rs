@@ -4,12 +4,12 @@ use macroquad::{
     color::{Color, BLUE, GREEN, PURPLE, RED, YELLOW},
     input::{get_keys_down, get_keys_pressed, KeyCode},
     shapes::draw_rectangle,
+    time::get_frame_time,
     window::{next_frame, screen_height, screen_width},
 };
 use netcode::{client::Game, State, MAX_UNITS_PER_SECOND};
 
 const PLAYER_SIZE: f32 = 30.;
-const SPEED_MULTIPLIER: f32 = 1000.;
 const GROUND_HEIGHT: f32 = 0.8;
 const JUMP_MULTIPLIER: f32 = 300.;
 const PLAYER_COLORS: [Color; 5] = [RED, GREEN, BLUE, YELLOW, PURPLE];
@@ -19,6 +19,8 @@ async fn main() -> anyhow::Result<()> {
     let mut game = Game::new();
 
     loop {
+        let dt = macroquad::time::get_frame_time();
+
         draw_ground();
 
         draw_players(&mut game.state);
@@ -65,8 +67,8 @@ fn handle_keys(game: &mut Game) {
 fn handle_key_hold(key_codes: HashSet<KeyCode>, game: &mut Game) {
     for key in key_codes {
         match key {
-            KeyCode::D => game.move_player(MAX_UNITS_PER_SECOND as f32),
-            KeyCode::A => game.move_player(-MAX_UNITS_PER_SECOND as f32),
+            KeyCode::D => game.move_player(MAX_UNITS_PER_SECOND as f32 * get_frame_time()),
+            KeyCode::A => game.move_player(-MAX_UNITS_PER_SECOND as f32 * get_frame_time()),
             _ => {}
         }
     }
@@ -75,7 +77,7 @@ fn handle_key_hold(key_codes: HashSet<KeyCode>, game: &mut Game) {
 fn draw_players(state: &mut State) {
     for (idx, player) in state.players.iter().enumerate() {
         draw_rectangle(
-            player.x as f32 * SPEED_MULTIPLIER,
+            player.x as f32,
             (screen_height() * GROUND_HEIGHT) - PLAYER_SIZE - (player.y() as f32 * JUMP_MULTIPLIER),
             PLAYER_SIZE,
             PLAYER_SIZE,

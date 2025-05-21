@@ -36,7 +36,7 @@ impl Game {
                 timestamp: Utc::now(),
             },
             player_idx: None,
-            client: ClientBuilder::new("https://f04e4c981694.ngrok.app")
+            client: ClientBuilder::new("http://localhost:7878")
                 .on(ERROR_CHANNEL, |payload, _| {
                     eprintln!("Received error: {:?}", payload);
                 })
@@ -52,22 +52,19 @@ impl Game {
                         eprintln!("Received bad payload on state");
                     }
                 })
-                .on(JOIN_CHANNEL, move |payload, _| {
-                    println!("received join");
-                    match payload {
-                        Payload::Text(text) => {
-                            let data = serde_json::from_str::<JoinResponse>(
-                                text.first().unwrap().clone().as_str().unwrap(),
-                            )
-                            .unwrap();
-                            join_sender.send(data).unwrap();
-                        }
-                        _ => {
-                            eprintln!(
-                                "Received non-binary payload on join, received {:?}",
-                                payload
-                            );
-                        }
+                .on(JOIN_CHANNEL, move |payload, _| match payload {
+                    Payload::Text(text) => {
+                        let data = serde_json::from_str::<JoinResponse>(
+                            text.first().unwrap().clone().as_str().unwrap(),
+                        )
+                        .unwrap();
+                        join_sender.send(data).unwrap();
+                    }
+                    _ => {
+                        eprintln!(
+                            "Received non-binary payload on join, received {:?}",
+                            payload
+                        );
                     }
                 })
                 .connect()
