@@ -40,9 +40,7 @@ async fn on_connect(socket: SocketRef, State(state): State<AppState>) {
                         let player_id = state.player_join();
                         let response =
                             serde_json::to_string(&JoinResponse::new(player_id)).unwrap();
-                        tokio::spawn(async move {
-                            let _ = socket.local().emit(JOIN_CHANNEL, &response).await;
-                        });
+                        tokio::spawn(socket.local().emit(JOIN_CHANNEL, &response));
                     }
                     netcode::Action::Player { id, action } => match action {
                         netcode::event::PlayerAction::Leave => {
@@ -80,9 +78,7 @@ async fn on_connect(socket: SocketRef, State(state): State<AppState>) {
 
 fn try_action(result: Result<(), netcode::state::StateError>, socket: SocketRef) {
     if let Err(e) = result {
-        tokio::spawn(async move {
-            let _ = socket.local().emit(ERROR_CHANNEL, &e.to_string()).await;
-        });
+        tokio::spawn(socket.local().emit(ERROR_CHANNEL, &e.to_string()));
     }
 }
 
