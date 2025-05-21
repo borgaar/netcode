@@ -6,7 +6,8 @@ use rust_socketio::{client::Client, ClientBuilder, Payload};
 use crate::{
     event::{JoinResponse, PlayerAction},
     state::Player,
-    Action, State, ACTION_CHANNEL, ERROR_CHANNEL, JOIN_CHANNEL, STATE_CHANNEL,
+    Action, State, ACTION_CHANNEL, ERROR_CHANNEL, JOIN_CHANNEL, MAX_UNITS_PER_SECOND,
+    STATE_CHANNEL,
 };
 
 pub struct Game {
@@ -87,21 +88,61 @@ impl Game {
         self.join_update();
     }
     fn state_update(&mut self) {
-        while let Ok(state) = self.state_receiver.try_recv() {
-            self.state = state;
+        while let Ok(server_state) = self.state_receiver.try_recv() {
+            if let Some(player_idx) = self.player_idx {
+                let time_since_last_update = (Utc::now() - self.state.timestamp).as_seconds_f64();
+
+                let player_x = self.state.players.get(&player_idx).unwrap().x;
+
+                let diff_x = server_state.players.get(&player_idx).unwrap().x - player_x;
+
+                let max_diff_x = time_since_last_update * MAX_UNITS_PER_SECOND;
+
+                let effective_diff_x = if diff_x.abs() > max_diff_x.abs() {
+                    if diff_x.is_sign_negative() {
+                        -max_diff_x
+                    } else {
+                        max_diff_x
+                    }
+                } else {
+                    diff_x
+                };
+
+                self.state = server_state;
+
+                self.state.players.get_mut(&player_idx).unwrap().x += effective_diff_x;
+
+                // Send the move action
+                self.client
+                    .emit(
+                        ACTION_CHANNEL,
+                        Payload::Text(vec![serde_json::to_value(&Action::Player {
+                            id: player_idx,
+                            action: PlayerAction::Move { delta_x: diff_x },
+                        })
+                        .unwrap()]),
+                    )
+                    .unwrap();
+            }
         }
     }
     fn join_update(&mut self) {
         while let Ok(join_response) = self.join_receiver.try_recv() {
             self.player_idx = Some(join_response.player_id);
-            self.state
-                .players.insert(join_response.player_id, Player::new(join_response.player_id));
+            self.state.players.insert(
+                join_response.player_id,
+                Player::new(join_response.player_id),
+            );
         }
     }
     pub fn jump(&mut self) {
         if let Some(player_idx) = self.player_idx {
             // Optimistic update
-            self.state.players.get_mut(&player_idx).unwrap().last_jump_at = Some(chrono::Utc::now());
+            self.state
+                .players
+                .get_mut(&player_idx)
+                .unwrap()
+                .last_jump_at = Some(chrono::Utc::now());
 
             // Send the jump action
             self.client
@@ -117,23 +158,11 @@ impl Game {
         }
     }
     pub fn move_player(&mut self, delta_x: f32) {
-        if let Some(player_idx) = self.player_idx {
-            // Optimistic update
-            self.state.players.get_mut(&player_idx).unwrap().x += delta_x as f64;
+        let Some(player_idx) = self.player_idx else {
+            return;
+        };
 
-            // Send the move action
-            self.client
-                .emit(
-                    ACTION_CHANNEL,
-                    Payload::Text(vec![serde_json::to_value(&Action::Player {
-                        id: player_idx,
-                        action: PlayerAction::Move {
-                            delta_x: delta_x as _,
-                        },
-                    })
-                    .unwrap()]),
-                )
-                .unwrap();
-        }
+        // Optimistic update
+        self.state.players.get_mut(&player_idx).unwrap().x += delta_x as f64;
     }
 }
