@@ -13,7 +13,7 @@ pub struct State {
 pub enum StateError {
     #[error("No player found with id: {0}. Total players is {1}")]
     NoPlayer(usize, usize),
-    #[error("Player moved {units} units in the last {timeframe_ms} ms. Expected at most {MAX_UNITS_PER_SECOND} unit/ms")]
+    #[error("Player moved {units} units in the last {timeframe_ms} ms. Expected at most {MAX_UNITS_PER_MS} unit/ms")]
     Cheating {
         units: f64,
         timeframe_ms: i64
