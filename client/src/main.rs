@@ -34,9 +34,9 @@ async fn main() -> anyhow::Result<()> {
 fn handle_key_press(key_codes: HashSet<KeyCode>, game: &mut Game) {
     for key in key_codes {
         match key {
-            KeyCode::W => match game.player_id {
-                Some(id) => {
-                    if let Some(player) = game.state.players.iter().find(|p| p.id == id) {
+            KeyCode::W => match game.player_idx {
+                Some(idx) => {
+                    if let Some(player) = game.state.players.get(idx) {
                         if player.y() <= 0. {
                             game.jump();
                         }
@@ -45,7 +45,7 @@ fn handle_key_press(key_codes: HashSet<KeyCode>, game: &mut Game) {
                 None => {}
             },
             KeyCode::J => {
-                if let None = game.player_id {
+                if let None = game.player_idx {
                     game.join();
                 }
             }

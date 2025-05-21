@@ -13,7 +13,7 @@ pub struct Game {
     state_receiver: Receiver<State>,
     join_receiver: Receiver<JoinResponse>,
     pub state: State,
-    pub player_id: Option<usize>,
+    pub player_idx: Option<usize>,
     client: Client,
 }
 
@@ -35,7 +35,7 @@ impl Game {
                 players: vec![],
                 timestamp: Utc::now(),
             },
-            player_id: None,
+            player_idx: None,
             client: ClientBuilder::new("http://0.0.0.0:7878")
                 .on(ERROR_CHANNEL, |payload, _| {
                     eprintln!("Received error: {:?}", payload);
@@ -96,25 +96,21 @@ impl Game {
     }
     fn join_update(&mut self) {
         while let Ok(join_response) = self.join_receiver.try_recv() {
-            self.player_id = Some(join_response.player_id);
+            self.player_idx = Some(join_response.player_id);
             self.state
                 .players
                 .push(Player::new(join_response.player_id));
         }
     }
     pub fn jump(&mut self) {
-        if let Some(player_idx) = self
-            .state
-            .players
-            .iter()
-            .position(|p| p.id == self.player_id.unwrap())
-        {
+        if let Some(player_idx) = self.player_idx {
             self.state.players.get_mut(player_idx).unwrap().last_jump_at = Some(chrono::Utc::now());
             self.client
                 .emit(
                     ACTION_CHANNEL,
-                    Payload::Text(vec![serde_json::to_value(&PlayerAction::Jump {
-                        at: Utc::now(),
+                    Payload::Text(vec![serde_json::to_value(&Action::Player {
+                        id: player_idx,
+                        action: PlayerAction::Jump { at: Utc::now() },
                     })
                     .unwrap()]),
                 )
@@ -122,18 +118,13 @@ impl Game {
         }
     }
     pub fn move_player(&mut self, delta_x: f32) {
-        if let Some(player_idx) = self
-            .state
-            .players
-            .iter()
-            .position(|p| p.id == self.player_id.unwrap())
-        {
+        if let Some(player_idx) = self.player_idx {
             self.state.players.get_mut(player_idx).unwrap().x += delta_x as f64;
             self.client
                 .emit(
                     ACTION_CHANNEL,
                     Payload::Text(vec![serde_json::to_value(&Action::Player {
-                        id: self.player_id.unwrap(),
+                        id: player_idx,
                         action: PlayerAction::Move {
                             delta_x: delta_x as _,
                         },
