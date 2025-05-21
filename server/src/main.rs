@@ -1,6 +1,7 @@
 use netcode::{event::JoinResponse, ACTION_CHANNEL, ERROR_CHANNEL, JOIN_CHANNEL, STATE_CHANNEL};
 use socketioxide::{
     extract::{Data, SocketRef, State},
+    socket::DisconnectReason,
     SocketIo,
 };
 use std::{
@@ -8,12 +9,17 @@ use std::{
     time::Duration,
 };
 
-const STATE_UPDATE_INTERVAL: Duration = Duration::from_millis(200);
+/// Time between each tick update on the server's state
+const STATE_UPDATE_INTERVAL: Duration = Duration::from_millis(40);
 
+/// Handles socket connections
 async fn on_connect(socket: SocketRef, State(state): State<AppState>) {
     let state = state.state;
+    let user_id = Arc::new(Mutex::new(0));
 
     let socket_state = state.clone();
+
+    let socket_user_id = user_id.clone();
     socket.on(
         ACTION_CHANNEL,
         async move |socket: SocketRef, Data::<serde_json::Value>(data)| {
@@ -36,16 +42,15 @@ async fn on_connect(socket: SocketRef, State(state): State<AppState>) {
                 match event {
                     netcode::Action::Join => {
                         let player_id = state.player_join();
+                        {
+                            *socket_user_id.lock().unwrap() = player_id;
+                        }
                         let response =
                             serde_json::to_string(&JoinResponse::new(player_id)).unwrap();
                         println!("Player joined the game. Got ID {player_id}");
                         tokio::spawn(socket.local().emit(JOIN_CHANNEL, &response));
                     }
                     netcode::Action::Player { id, action } => match action {
-                        netcode::event::PlayerAction::Leave => {
-                            try_action(state.player_leave(id), socket);
-                            println!("Player {id} left the session");
-                        }
                         netcode::event::PlayerAction::Jump { at } => {
                             println!("Player {id} jumped at {at}");
                             try_action(state.player_jump(id, at), socket);
@@ -59,6 +64,14 @@ async fn on_connect(socket: SocketRef, State(state): State<AppState>) {
             }
         },
     );
+
+    let disconnect_state = state.clone();
+    socket.on_disconnect(async move |socket: SocketRef, _: DisconnectReason| {
+        let user_id = *user_id.lock().unwrap();
+        println!("Player {user_id} left the session");
+        let mut state = disconnect_state.lock().unwrap();
+        try_action(state.player_leave(user_id), socket);
+    });
 
     let global_state = state.clone();
     tokio::spawn(async move {

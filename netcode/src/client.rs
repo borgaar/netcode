@@ -1,4 +1,8 @@
-use std::sync::mpsc::{channel, Receiver};
+use std::{
+    collections::HashMap,
+    sync::mpsc::{channel, Receiver},
+    usize,
+};
 
 use chrono::Utc;
 use rust_socketio::{client::Client, ClientBuilder, Payload};
@@ -13,7 +17,9 @@ use crate::{
 pub struct Game {
     state_receiver: Receiver<State>,
     join_receiver: Receiver<JoinResponse>,
-    pub state: State,
+    pub curr_state: State,
+    target_state: State,
+    previous_state: State,
     pub player_idx: Option<usize>,
     client: Client,
 }
@@ -32,7 +38,9 @@ impl Game {
         let game = Self {
             state_receiver,
             join_receiver,
-            state: Default::default(),
+            curr_state: Default::default(),
+            previous_state: Default::default(),
+            target_state: Default::default(),
             player_idx: None,
             client: ClientBuilder::new("http://localhost:7878")
                 .on(ERROR_CHANNEL, |payload, _| {
@@ -75,7 +83,6 @@ impl Game {
         game
     }
     pub fn join(&self) {
-        println!("Joining");
         self.client
             .emit(
                 ACTION_CHANNEL,
@@ -87,38 +94,106 @@ impl Game {
         self.state_update();
         self.join_update();
     }
+
+    fn calculate_interpolation_for_frame(&mut self) {
+        let prev = self.previous_state.timestamp;
+        let target = self.target_state.timestamp;
+        let curr = Utc::now();
+        let t = (curr - target).as_seconds_f64() / (target - prev).as_seconds_f64();
+
+        let player_id = self.player_idx.unwrap_or(usize::MAX);
+
+        let self_player = self
+            .curr_state
+            .players
+            .get(&player_id)
+            .or_else(|| self.target_state.players.get(&player_id));
+
+        let new_curr_players = self
+            .target_state
+            .players
+            .iter()
+            .map(|(tar_player_id, tar_player)| {
+                if *tar_player_id == player_id && self_player.is_some() {
+                    return (self_player.unwrap().id, self_player.unwrap().clone());
+                }
+
+                let prev_player = self
+                    .previous_state
+                    .players
+                    .get(&tar_player_id)
+                    .unwrap_or_else(|| tar_player);
+
+                let x = lerp(prev_player.x, tar_player.x, t);
+
+                return (
+                    *tar_player_id,
+                    Player {
+                        id: *tar_player_id,
+                        x,
+                        last_jump_at: tar_player.last_jump_at,
+                    },
+                );
+            })
+            .collect::<HashMap<_, _>>();
+
+        self.curr_state.players = new_curr_players;
+    }
+
     fn state_update(&mut self) {
+        self.calculate_interpolation_for_frame();
+
         while let Ok(server_state) = self.state_receiver.try_recv() {
-            if let Some(player_idx) = self.player_idx {
-                let time_since_last_update = (Utc::now() - self.state.timestamp).as_seconds_f64();
+            // server update
+            self.previous_state = self.target_state.clone();
+            self.target_state = server_state.clone();
 
-                let player_x = self.state.players.get(&player_idx).unwrap().x;
+            if self.player_idx.is_none_or(|p_idx| {
+                !(self.curr_state.players.contains_key(&p_idx)
+                    && self.previous_state.players.contains_key(&p_idx)
+                    && self.target_state.players.contains_key(&p_idx))
+            }) {
+                // self.target_state = server_state;
+                continue;
+            };
 
-                let diff_x = server_state.players.get(&player_idx).unwrap().x - player_x;
+            let player_idx = self.player_idx.unwrap();
 
-                let max_diff_x = time_since_last_update * MAX_UNITS_PER_SECOND;
+            let time_since_last_update = (Utc::now() - self.curr_state.timestamp).as_seconds_f64();
 
-                let effective_diff_x = if diff_x.abs() > max_diff_x.abs() {
-                    if diff_x.is_sign_negative() {
-                        -max_diff_x
-                    } else {
-                        max_diff_x
-                    }
+            let player_x = self.curr_state.players.get(&player_idx).unwrap().x;
+
+            let x_diff = player_x - server_state.players.get(&player_idx).unwrap().x;
+
+            let max_diff_x = time_since_last_update * MAX_UNITS_PER_SECOND;
+
+            let effective_diff_x = if x_diff.abs() > max_diff_x.abs() {
+                if x_diff.is_sign_negative() {
+                    -max_diff_x
                 } else {
-                    diff_x
-                };
+                    max_diff_x
+                }
+            } else {
+                x_diff
+            };
 
-                self.state = server_state;
+            self.curr_state
+                .players
+                .entry(player_idx)
+                .and_modify(|player| player.x = server_state.players.get(&player_idx).unwrap().x);
 
-                self.state.players.get_mut(&player_idx).unwrap().x += effective_diff_x;
+            self.curr_state.players.get_mut(&player_idx).unwrap().x += effective_diff_x;
 
+            if effective_diff_x.abs() > 0.01 {
                 // Send the move action
                 self.client
                     .emit(
                         ACTION_CHANNEL,
                         Payload::Text(vec![serde_json::to_value(&Action::Player {
                             id: player_idx,
-                            action: PlayerAction::Move { delta_x: diff_x },
+                            action: PlayerAction::Move {
+                                delta_x: effective_diff_x,
+                            },
                         })
                         .unwrap()]),
                     )
@@ -126,10 +201,11 @@ impl Game {
             }
         }
     }
+
     fn join_update(&mut self) {
         while let Ok(join_response) = self.join_receiver.try_recv() {
             self.player_idx = Some(join_response.player_id);
-            self.state.players.insert(
+            self.target_state.players.insert(
                 join_response.player_id,
                 Player::new(join_response.player_id),
             );
@@ -138,13 +214,12 @@ impl Game {
     pub fn jump(&mut self) {
         if let Some(player_idx) = self.player_idx {
             // Optimistic update
-            self.state
+            self.curr_state
                 .players
                 .get_mut(&player_idx)
                 .unwrap()
                 .last_jump_at = Some(chrono::Utc::now());
 
-            // Send the jump action
             self.client
                 .emit(
                     ACTION_CHANNEL,
@@ -163,6 +238,28 @@ impl Game {
         };
 
         // Optimistic update
-        self.state.players.get_mut(&player_idx).unwrap().x += delta_x as f64;
+        self.curr_state.players.get_mut(&player_idx).unwrap().x += delta_x as f64;
+    }
+}
+
+/// Linear interpolation between two values
+///
+/// * `a` - The start value
+/// * `b` - The end value
+/// * `t` - The interpolation factor (between 0.0 and 1.0)
+///
+/// Returns the interpolated value: a + t * (b - a)
+pub fn lerp(a: f64, b: f64, t: f64) -> f64 {
+    a + t * (b - a)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_lerp() {
+        assert_eq!(lerp(0., 1., 0.5), 0.5);
+        assert_eq!(lerp(0., 10., 0.25), 2.5);
     }
 }

@@ -13,17 +13,16 @@ const PLAYER_SIZE: f32 = 30.;
 const GROUND_HEIGHT: f32 = 0.8;
 const JUMP_MULTIPLIER: f32 = 300.;
 const PLAYER_COLORS: [Color; 5] = [RED, GREEN, BLUE, YELLOW, PURPLE];
+const PIXELS_PER_UNIT: f32 = 40.;
 
 #[macroquad::main("BasicShapes")]
 async fn main() -> anyhow::Result<()> {
     let mut game = Game::new();
 
     loop {
-        let dt = macroquad::time::get_frame_time();
-
         draw_ground();
 
-        draw_players(&mut game.state);
+        draw_players(&mut game.curr_state);
 
         handle_keys(&mut game);
 
@@ -38,7 +37,7 @@ fn handle_key_press(key_codes: HashSet<KeyCode>, game: &mut Game) {
         match key {
             KeyCode::W => match game.player_idx {
                 Some(idx) => {
-                    if let Some(player) = game.state.players.get(&idx) {
+                    if let Some(player) = game.curr_state.players.get(&idx) {
                         if player.y() <= 0. {
                             game.jump();
                         }
@@ -77,7 +76,7 @@ fn handle_key_hold(key_codes: HashSet<KeyCode>, game: &mut Game) {
 fn draw_players(state: &mut State) {
     for (idx, player) in state.players.iter() {
         draw_rectangle(
-            player.x as f32,
+            player.x as f32 * PIXELS_PER_UNIT,
             (screen_height() * GROUND_HEIGHT) - PLAYER_SIZE - (player.y() as f32 * JUMP_MULTIPLIER),
             PLAYER_SIZE,
             PLAYER_SIZE,

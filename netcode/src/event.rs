@@ -9,7 +9,6 @@ pub enum Action {
 
 #[derive(Debug, Deserialize, Serialize, Clone)]
 pub enum PlayerAction {
-    Leave,
     Jump { at: chrono::DateTime<Utc> },
     Move { delta_x: f64 },
 }
