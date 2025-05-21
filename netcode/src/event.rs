@@ -2,21 +2,16 @@ use chrono::Utc;
 use serde::{Deserialize, Serialize};
 
 #[derive(Debug, Deserialize, Serialize, Clone)]
-pub struct Action {
-    pub player_id: usize,
-    pub variant: Variant,
-}
-
-#[derive(Debug, Deserialize, Serialize, Clone)]
-pub enum Variant {
+pub enum Action {
     Join,
-    Jump(JumpAction),
-    Movement(f64),
+    Player { id: usize, action: PlayerAction },
 }
 
 #[derive(Debug, Deserialize, Serialize, Clone)]
-pub struct JumpAction {
-    pub at: chrono::DateTime<Utc>,
+pub enum PlayerAction {
+    Leave,
+    Jump { at: chrono::DateTime<Utc> },
+    Move { delta_x: f64 },
 }
 
 #[derive(Debug, Deserialize, Serialize, Clone)]
@@ -29,20 +24,3 @@ impl JoinResponse {
         Self { player_id }
     }
 }
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn serialization() {
-        let payload = Action {
-            player_id: 1,
-            variant: Variant::Movement(3.4),
-        };
-
-        println!("{}", serde_json::to_string_pretty(&payload).unwrap());
-        panic!()
-    }
-}
-

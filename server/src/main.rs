@@ -39,20 +39,21 @@ async fn on_connect(
             {
                 let mut state = socket_state.lock().unwrap();
 
-                match event.variant {
-                    netcode::event::Variant::Jump(jump) => {
-                        state.player_jump(event.player_id, jump.at).unwrap();
-                    }
-                    netcode::event::Variant::Movement(movement) => {
-                        state.player_move(event.player_id, movement);
-                    }
-                    netcode::event::Variant::Join => {
+                match event {
+                    netcode::Action::Join => {
                         let player_id = state.player_join();
                         let response =
                             serde_json::to_string(&JoinResponse::new(player_id)).unwrap();
                         socket.local().emit(JOIN_CHANNEL, &response);
                     }
-                };
+                    netcode::Action::Player { id, action } => match action {
+                        netcode::event::PlayerAction::Leave => state.player_leave(id),
+                        netcode::event::PlayerAction::Jump { at } => state.player_jump(id, at),
+                        netcode::event::PlayerAction::Move { delta_x } => {
+                            state.player_move(id, delta_x)
+                        }
+                    },
+                }
             }
         },
     );
