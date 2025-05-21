@@ -38,7 +38,10 @@ impl Game {
             player_idx: None,
             client: ClientBuilder::new("http://localhost:7878")
                 .on(ERROR_CHANNEL, |payload, _| {
-                    eprintln!("Received error: {:?}", payload);
+                    let Payload::Text(val) = payload else {
+                        return;
+                    };
+                    eprintln!("{}", val.first().unwrap().as_str().unwrap());
                 })
                 .on(STATE_CHANNEL, move |payload, _| match payload {
                     Payload::Text(text) => {
