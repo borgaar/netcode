@@ -104,7 +104,10 @@ impl Game {
     }
     pub fn jump(&mut self) {
         if let Some(player_idx) = self.player_idx {
+            // Optimistic update
             self.state.players.get_mut(player_idx).unwrap().last_jump_at = Some(chrono::Utc::now());
+
+            // Send the jump action
             self.client
                 .emit(
                     ACTION_CHANNEL,
@@ -119,7 +122,10 @@ impl Game {
     }
     pub fn move_player(&mut self, delta_x: f32) {
         if let Some(player_idx) = self.player_idx {
+            // Optimistic update
             self.state.players.get_mut(player_idx).unwrap().x += delta_x as f64;
+
+            // Send the move action
             self.client
                 .emit(
                     ACTION_CHANNEL,
