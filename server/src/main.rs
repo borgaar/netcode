@@ -8,7 +8,7 @@ use std::{
     time::Duration,
 };
 
-const STATE_UPDATE_INTERVAL: Duration = Duration::from_millis(300);
+const STATE_UPDATE_INTERVAL: Duration = Duration::from_millis(200);
 
 async fn on_connect(socket: SocketRef, State(state): State<AppState>) {
     let state = state.state;
@@ -22,12 +22,10 @@ async fn on_connect(socket: SocketRef, State(state): State<AppState>) {
             let event = match event {
                 Ok(e) => e,
                 Err(err) => {
-                    socket
-                        .emit(
-                            ERROR_CHANNEL,
-                            &format!("Error while parsing event payload: {}", err),
-                        )
-                        .unwrap();
+                    let _ = socket.emit(
+                        ERROR_CHANNEL,
+                        &format!("Error while parsing event payload: {}", err),
+                    );
                     return;
                 }
             };
@@ -40,16 +38,20 @@ async fn on_connect(socket: SocketRef, State(state): State<AppState>) {
                         let player_id = state.player_join();
                         let response =
                             serde_json::to_string(&JoinResponse::new(player_id)).unwrap();
+                        println!("Player joined the game. Got ID {player_id}");
                         tokio::spawn(socket.local().emit(JOIN_CHANNEL, &response));
                     }
                     netcode::Action::Player { id, action } => match action {
                         netcode::event::PlayerAction::Leave => {
                             try_action(state.player_leave(id), socket);
+                            println!("Player {id} left the session");
                         }
                         netcode::event::PlayerAction::Jump { at } => {
+                            println!("Player {id} jumped at {at}");
                             try_action(state.player_jump(id, at), socket);
                         }
                         netcode::event::PlayerAction::Move { delta_x } => {
+                            println!("Player {id} moved by {delta_x} units");
                             try_action(state.player_move(id, delta_x), socket);
                         }
                     },
