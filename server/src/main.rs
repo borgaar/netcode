@@ -45,12 +45,14 @@ async fn on_connect(socket: SocketRef, State(state): State<AppState>) {
                         });
                     }
                     netcode::Action::Player { id, action } => match action {
-                        netcode::event::PlayerAction::Leave => state.player_leave(id).unwrap(),
+                        netcode::event::PlayerAction::Leave => {
+                            try_action(state.player_leave(id));
+                        }
                         netcode::event::PlayerAction::Jump { at } => {
-                            state.player_jump(id, at).unwrap()
+                            try_action(state.player_jump(id, at));
                         }
                         netcode::event::PlayerAction::Move { delta_x } => {
-                            state.player_move(id, delta_x).unwrap()
+                            try_action(state.player_move(id, delta_x));
                         }
                     },
                 }
@@ -73,6 +75,14 @@ async fn on_connect(socket: SocketRef, State(state): State<AppState>) {
             tokio::time::sleep(STATE_UPDATE_INTERVAL).await
         }
     });
+}
+
+fn try_action(result: Result<(), netcode::state::StateError>) {
+    if let Err(e) = result {
+        tokio::spawn(async move {
+            socket.emit(ERROR_CHANNEL, &e.to_string());
+        })
+    }
 }
 
 #[derive(Debug, Clone, Default)]
