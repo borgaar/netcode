@@ -47,10 +47,10 @@ async fn on_connect(
                         socket.local().emit(JOIN_CHANNEL, &response);
                     }
                     netcode::Action::Player { id, action } => match action {
-                        netcode::event::PlayerAction::Leave => state.player_leave(id),
-                        netcode::event::PlayerAction::Jump { at } => state.player_jump(id, at),
+                        netcode::event::PlayerAction::Leave => state.player_leave(id).unwrap(),
+                        netcode::event::PlayerAction::Jump { at } => state.player_jump(id, at).unwrap(),
                         netcode::event::PlayerAction::Move { delta_x } => {
-                            state.player_move(id, delta_x)
+                            state.player_move(id, delta_x).unwrap()
                         }
                     },
                 }
