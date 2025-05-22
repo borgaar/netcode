@@ -1,4 +1,4 @@
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 
 use crate::{event::PlayerAction, MAX_UNITS_PER_SECOND};
 use chrono::{DateTime, Utc};
@@ -12,7 +12,7 @@ pub struct State {
     pub timestamp: DateTime<Utc>,
     #[serde(skip)]
     new_player_id: usize,
-    pub acknowledged: HashMap<Uuid, PlayerAction>,
+    pub acknowledged: HashSet<Uuid>,
 }
 
 impl Default for State {
@@ -21,7 +21,7 @@ impl Default for State {
             players: HashMap::new(),
             timestamp: Utc::now(),
             new_player_id: 0,
-            acknowledged: HashMap::new(),
+            acknowledged: HashSet::new(),
         }
     }
 }
@@ -81,13 +81,7 @@ impl State {
         //     });
         // }
 
-        self.acknowledged.insert(
-            ack_id,
-            PlayerAction::Move {
-                delta_x: delta_x,
-                id: ack_id,
-            },
-        );
+        self.acknowledged.insert(ack_id);
         self.player(player_id)?.x += delta_x;
         Ok(())
     }
