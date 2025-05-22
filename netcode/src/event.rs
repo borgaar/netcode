@@ -1,5 +1,6 @@
 use chrono::Utc;
 use serde::{Deserialize, Serialize};
+use uuid::Uuid;
 
 #[derive(Debug, Deserialize, Serialize, Clone)]
 pub enum Action {
@@ -10,7 +11,7 @@ pub enum Action {
 #[derive(Debug, Deserialize, Serialize, Clone)]
 pub enum PlayerAction {
     Jump { at: chrono::DateTime<Utc> },
-    Move { delta_x: f64 },
+    Move { delta_x: f64, id: Uuid },
 }
 
 #[derive(Debug, Deserialize, Serialize, Clone)]
