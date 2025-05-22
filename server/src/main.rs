@@ -10,7 +10,7 @@ use std::{
 };
 
 /// Time between each tick update on the server's state
-const STATE_UPDATE_INTERVAL: Duration = Duration::from_millis(750);
+const STATE_UPDATE_INTERVAL: Duration = Duration::from_millis(16);
 
 /// Handles socket connections
 async fn on_connect(socket: SocketRef, State(state): State<AppState>) {
@@ -50,7 +50,10 @@ async fn on_connect(socket: SocketRef, State(state): State<AppState>) {
                         println!("Player joined the game. Got ID {player_id}");
                         tokio::spawn(socket.local().emit(JOIN_CHANNEL, &response));
                     }
-                    netcode::Action::Player { id: player_id, action } => match action {
+                    netcode::Action::Player {
+                        id: player_id,
+                        action,
+                    } => match action {
                         netcode::event::PlayerAction::Jump { at } => {
                             println!("Player {player_id} jumped at {at}");
                             try_action(state.player_jump(player_id, at), socket);

@@ -62,7 +62,7 @@ impl Game {
                         .unwrap();
                         let sender = state_sender.clone();
                         thread::spawn(move || {
-                            // thread::sleep(std::time::Duration::from_millis(SIMULATED_PING_MS / 2));
+                            thread::sleep(std::time::Duration::from_millis(SIMULATED_PING_MS / 2));
                             sender.send(data).unwrap();
                         });
                     }
@@ -78,7 +78,7 @@ impl Game {
                         .unwrap();
                         let sender = join_sender.clone();
                         thread::spawn(move || {
-                            // thread::sleep(std::time::Duration::from_millis(SIMULATED_PING_MS / 2));
+                            thread::sleep(std::time::Duration::from_millis(SIMULATED_PING_MS / 2));
                             sender.send(data).unwrap();
                         });
                     }
@@ -179,6 +179,16 @@ impl Game {
 
             let time_since_last_update = (Utc::now() - self.curr_state.timestamp).as_seconds_f64();
 
+            // Remove acknowledged actions
+            self.unacknowledged
+                .retain(|key, _| server_state.acknowledged.get(key).is_some());
+
+            // Get the unacknowledged diff from the last update
+            let unack_x_diff = self.get_unack_x_diff();
+
+            // Add unack_x_diff to the current player position
+            self.curr_state.players.get_mut(&player_idx).unwrap().x += unack_x_diff;
+
             let x_diff = self.player().unwrap().x
                 - server_state
                     .players
@@ -197,6 +207,10 @@ impl Game {
             } else {
                 x_diff
             };
+
+            if effective_diff_x == 0.0 {
+                return;
+            }
 
             let server_side_x = server_state
                 .players
@@ -220,7 +234,30 @@ impl Game {
                     Payload::Text(vec![serde_json::to_value(&action).unwrap()]),
                 )
                 .unwrap();
+
+            // Add the action to the unacknowledged actions
+            let uuid = Uuid::new_v4();
+            self.unacknowledged.insert(
+                uuid,
+                PlayerAction::Move {
+                    delta_x: effective_diff_x,
+                    id: uuid,
+                },
+            );
         }
+    }
+
+    fn get_unack_x_diff(&self) -> f64 {
+        let mut x_diff = 0.0;
+        for (_, action) in self.unacknowledged.iter() {
+            match action {
+                PlayerAction::Move { delta_x, id } => {
+                    x_diff += *delta_x;
+                }
+                PlayerAction::Jump { at: _ } => {}
+            }
+        }
+        x_diff
     }
 
     fn join_update(&mut self) {
