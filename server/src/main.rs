@@ -13,8 +13,8 @@ use std::{
 const STATE_UPDATE_INTERVAL: Duration = Duration::from_millis(500);
 
 /// Handles socket connections
-async fn on_connect(socket: SocketRef, State(state): State<AppState>) {
-    let state = state.state;
+async fn on_connect(socket: SocketRef, State(state): State<Arc<AppState>>) {
+    let state = &state.state;
     let user_id = Arc::new(Mutex::new(0));
 
     let socket_state = state.clone();
@@ -83,7 +83,7 @@ async fn on_connect(socket: SocketRef, State(state): State<AppState>) {
             {
                 let mut state = state.lock().unwrap();
                 let message = state.tick();
-                
+
                 dbg!(&message);
 
                 // Ignore error since we can just wait for the next state broadcast
@@ -108,10 +108,12 @@ struct AppState {
 
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
-    let state = AppState::default();
+    let state = Arc::new(AppState::default());
 
-    let (layer, io) = SocketIo::builder().with_state(state).build_layer();
+    let (layer, io) = SocketIo::builder().with_state(state.clone()).build_layer();
     io.ns("/", on_connect);
+    
+    start_periodic_broadcast_to_namespace(io.clone(), state.clone());
 
     let app = axum::Router::new().layer(layer);
 
@@ -119,4 +121,26 @@ async fn main() -> anyhow::Result<()> {
     axum::serve(listener, app).await.unwrap();
 
     Ok(())
+}
+
+// Alternative: Broadcast to specific namespace
+fn start_periodic_broadcast_to_namespace(
+    io: SocketIo,
+    state: Arc<AppState>,
+) {
+    tokio::spawn(async move {
+        let mut interval = tokio::time::interval(STATE_UPDATE_INTERVAL);
+
+        loop {
+            interval.tick().await;
+
+            let message = state.state.lock().unwrap().tick();
+            
+            dbg!(&message);
+
+            if let Err(e) = io.of("/").unwrap().emit(STATE_CHANNEL, &message).await {
+                eprintln!("Failed to broadcast to namespace /: {}", e);
+            }
+        }
+    });
 }
