@@ -13,6 +13,16 @@ impl Action {
         Self::Join
     }
 
+    pub fn ack_id(&self) -> Option<Uuid> {
+        match self {
+            Action::Join => None,
+            Action::Player { action, id: _ } => match action {
+                PlayerAction::Jump { at } => None,
+                PlayerAction::Move { delta_x, id } => Some(id),
+            },
+        }
+    }
+
     pub fn player_jump(player_id: usize, at: chrono::DateTime<Utc>) -> Self {
         Self::Player {
             id: player_id,

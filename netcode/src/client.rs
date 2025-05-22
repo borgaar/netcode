@@ -249,7 +249,7 @@ impl Game {
 
     fn get_unack_x_diff(&self) -> f64 {
         let mut x_diff = 0.0;
-        for (_, action) in self.unacknowledged.iter() {
+        for action in self.unacknowledged.values() {
             match action {
                 PlayerAction::Move { delta_x, id } => {
                     x_diff += *delta_x;
