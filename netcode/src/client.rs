@@ -112,7 +112,7 @@ impl Game {
         let prev = self.previous_state.timestamp;
         let target = self.target_state.timestamp;
         let curr = Utc::now();
-        let t = (curr.min(target) - target).as_seconds_f64() / (target - prev).as_seconds_f64();
+        let t = (curr - target).as_seconds_f64() / (target - prev).as_seconds_f64();
 
         let player_id = self.player_idx.unwrap_or(usize::MAX);
 
@@ -211,7 +211,7 @@ impl Game {
                 x_diff
             };
 
-            if effective_diff_x == 0.0 {
+            if effective_diff_x.abs() <= 1.0 {
                 return;
             }
 
@@ -226,7 +226,7 @@ impl Game {
                 .players
                 .get_mut(&self.player_idx.unwrap())
                 .unwrap()
-                .x = server_side_x + unack_x_diff + effective_diff_x;
+                .x = server_side_x + effective_diff_x + unack_x_diff;
 
             // Send the move action
             let action = Action::player_move(player_idx, effective_diff_x);
