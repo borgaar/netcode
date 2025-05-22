@@ -83,6 +83,8 @@ async fn on_connect(socket: SocketRef, State(state): State<AppState>) {
             {
                 let mut state = state.lock().unwrap();
                 let message = state.tick();
+                
+                dbg!(message);
 
                 // Ignore error since we can just wait for the next state broadcast
                 let _ = socket.emit(STATE_CHANNEL, &message);
