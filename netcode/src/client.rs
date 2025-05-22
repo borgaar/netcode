@@ -15,7 +15,7 @@ use crate::{
     STATE_CHANNEL,
 };
 
-const SIMULATED_SEND_PING_MS: u64 = 1000;
+const SIMULATED_SEND_PING_MS: u64 = 150;
 
 pub struct Game {
     state_receiver: Receiver<State>,
@@ -184,7 +184,12 @@ impl Game {
                 .retain(|key, _| server_state.acknowledged.get(key).is_none());
 
             dbg!(&server_state.acknowledged);
-            dbg!(&self.unacknowledged);
+            dbg!(&self
+                .unacknowledged
+                .iter()
+                .map(|(key, _)| key)
+                .collect::<Vec<_>>());
+            println!("\n\n\n");
 
             // Get the unacknowledged diff from the last update
             let unack_x_diff = self.get_unack_x_diff();
@@ -206,8 +211,6 @@ impl Game {
                 x_diff
             };
 
-            dbg!(effective_diff_x);
-
             if effective_diff_x == 0.0 {
                 return;
             }
@@ -217,8 +220,6 @@ impl Game {
                 .get(&self.player().unwrap().id)
                 .unwrap()
                 .x;
-
-            dbg!(&server_state.players.get(&player_idx).unwrap());
 
             // Reconciliation
             self.curr_state
