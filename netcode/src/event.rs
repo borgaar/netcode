@@ -19,7 +19,7 @@ impl Action {
             Action::Player { action, id: _ } => match action {
                 PlayerAction::Jump { at } => None,
                 PlayerAction::Move { delta_x, id } => {
-                    Some((id, PlayerAction::Move { delta_x, id }))
+                    Some((*id, PlayerAction::Move { delta_x: *delta_x, id: *id }))
                 }
             },
         }
