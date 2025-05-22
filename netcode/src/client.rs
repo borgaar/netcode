@@ -181,7 +181,7 @@ impl Game {
 
             // Remove acknowledged actions
             self.unacknowledged
-                .retain(|key, _| server_state.acknowledged.get(key).is_some());
+                .retain(|key, _| server_state.acknowledged.get(key).is_none());
 
             // Get the unacknowledged diff from the last update
             let unack_x_diff = self.get_unack_x_diff();
