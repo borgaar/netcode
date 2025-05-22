@@ -164,7 +164,7 @@ impl Game {
     fn state_update(&mut self) {
         self.calculate_interpolation_for_frame();
 
-        while let Ok(server_state) = self.state_receiver.try_recv() {
+        for server_state in self.state_receiver.try_iter() {
             // server update
             self.previous_state = self.target_state.clone();
             self.target_state = server_state.clone();
@@ -259,7 +259,7 @@ impl Game {
     }
 
     fn join_update(&mut self) {
-        while let Ok(join_response) = self.join_receiver.try_recv() {
+        for join_response in self.join_receiver.try_iter() {
             self.player_idx = Some(join_response.player_id);
             self.curr_state.players.insert(
                 join_response.player_id,
