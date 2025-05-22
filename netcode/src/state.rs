@@ -1,8 +1,9 @@
 use std::collections::HashMap;
 
-use crate::MAX_UNITS_PER_SECOND;
+use crate::{event::PlayerAction, MAX_UNITS_PER_SECOND};
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
+use uuid::Uuid;
 
 /// Server state including position of all players and tick info
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -11,6 +12,7 @@ pub struct State {
     pub timestamp: DateTime<Utc>,
     #[serde(skip)]
     new_player_id: usize,
+    acknowledged: HashMap<Uuid, PlayerAction>,
 }
 
 impl Default for State {
@@ -19,6 +21,7 @@ impl Default for State {
             players: HashMap::new(),
             timestamp: Utc::now(),
             new_player_id: 0,
+            acknowledged: HashMap::new(),
         }
     }
 }
@@ -53,7 +56,12 @@ impl State {
     }
 
     /// Makes a player move, including cheat protection if the move is too long since the last game update
-    pub fn player_move(&mut self, player_id: usize, delta_x: f64) -> Result<(), StateError> {
+    pub fn player_move(
+        &mut self,
+        player_id: usize,
+        delta_x: f64,
+        ack_id: Uuid,
+    ) -> Result<(), StateError> {
         // let seconds_since_last_update = (Utc::now() - self.timestamp).as_seconds_f64();
         // let x_per_second = delta_x / seconds_since_last_update as f64;
 
@@ -67,6 +75,13 @@ impl State {
         //     });
         // }
 
+        self.acknowledged.insert(
+            ack_id,
+            PlayerAction::Move {
+                delta_x: delta_x,
+                id: ack_id,
+            },
+        );
         self.player(player_id)?.x += delta_x;
         Ok(())
     }

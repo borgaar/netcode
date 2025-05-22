@@ -50,14 +50,14 @@ async fn on_connect(socket: SocketRef, State(state): State<AppState>) {
                         println!("Player joined the game. Got ID {player_id}");
                         tokio::spawn(socket.local().emit(JOIN_CHANNEL, &response));
                     }
-                    netcode::Action::Player { id, action } => match action {
+                    netcode::Action::Player { id: player_id, action } => match action {
                         netcode::event::PlayerAction::Jump { at } => {
-                            println!("Player {id} jumped at {at}");
-                            try_action(state.player_jump(id, at), socket);
+                            println!("Player {player_id} jumped at {at}");
+                            try_action(state.player_jump(player_id, at), socket);
                         }
-                        netcode::event::PlayerAction::Move { delta_x } => {
-                            println!("Player {id} moved by {delta_x} units");
-                            try_action(state.player_move(id, delta_x), socket);
+                        netcode::event::PlayerAction::Move { delta_x, id } => {
+                            println!("Player {player_id} moved by {delta_x} units");
+                            try_action(state.player_move(player_id, delta_x, id), socket);
                         }
                     },
                 }
