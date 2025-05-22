@@ -12,7 +12,7 @@ pub struct State {
     pub timestamp: DateTime<Utc>,
     #[serde(skip)]
     new_player_id: usize,
-    acknowledged: HashMap<Uuid, PlayerAction>,
+    pub acknowledged: HashMap<Uuid, PlayerAction>,
 }
 
 impl Default for State {
@@ -40,7 +40,7 @@ impl State {
     pub fn tick(&mut self) {
         self.timestamp = Utc::now();
     }
-    
+
     /// Clears acknowledged requests that are part of the current state,
     /// to ensure no duplicate requests
     pub fn clear_ack(&mut self) {
