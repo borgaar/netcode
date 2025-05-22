@@ -12,3 +12,4 @@ anyhow = {workspace = true}
 rust_socketio = "0.6.0"
 thiserror.workspace = true
 tokio = "1.45.0"
+uuid = "1.16.0"

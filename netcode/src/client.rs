@@ -1,11 +1,12 @@
 use std::{
     collections::HashMap,
     sync::mpsc::{channel, Receiver},
-    usize,
+    thread, usize,
 };
 
 use chrono::Utc;
 use rust_socketio::{client::Client, ClientBuilder, Payload};
+use uuid::Uuid;
 
 use crate::{
     event::{JoinResponse, PlayerAction},
@@ -13,6 +14,13 @@ use crate::{
     Action, State, ACTION_CHANNEL, ERROR_CHANNEL, JOIN_CHANNEL, MAX_UNITS_PER_SECOND,
     STATE_CHANNEL,
 };
+
+struct MoveCommand {
+    uuid: Uuid,
+    delta_x: f32,
+}
+
+const SIMULATED_PING_MS: u64 = 150;
 
 pub struct Game {
     state_receiver: Receiver<State>,
@@ -22,6 +30,7 @@ pub struct Game {
     previous_state: State,
     pub player_idx: Option<usize>,
     client: Client,
+    unacknowledged: Vec<usize>,
 }
 
 impl Default for Game {
@@ -38,6 +47,7 @@ impl Game {
         let game = Self {
             state_receiver,
             join_receiver,
+            unacknowledged: vec![],
             curr_state: Default::default(),
             previous_state: Default::default(),
             target_state: Default::default(),
@@ -55,7 +65,11 @@ impl Game {
                             text.first().unwrap().clone().as_str().unwrap(),
                         )
                         .unwrap();
-                        state_sender.send(data).unwrap();
+                        let sender = state_sender.clone();
+                        thread::spawn(move || {
+                            // thread::sleep(std::time::Duration::from_millis(SIMULATED_PING_MS / 2));
+                            sender.send(data).unwrap();
+                        });
                     }
                     _ => {
                         eprintln!("Received bad payload on state");
@@ -67,7 +81,11 @@ impl Game {
                             text.first().unwrap().clone().as_str().unwrap(),
                         )
                         .unwrap();
-                        join_sender.send(data).unwrap();
+                        let sender = join_sender.clone();
+                        thread::spawn(move || {
+                            // thread::sleep(std::time::Duration::from_millis(SIMULATED_PING_MS / 2));
+                            sender.send(data).unwrap();
+                        });
                     }
                     _ => {
                         eprintln!(
@@ -140,6 +158,14 @@ impl Game {
         self.curr_state.players = new_curr_players;
     }
 
+    fn player(&self) -> Option<&Player> {
+        let Some(player_idx) = self.player_idx else {
+            return None;
+        };
+
+        self.curr_state.players.get(&player_idx)
+    }
+
     fn state_update(&mut self) {
         self.calculate_interpolation_for_frame();
 
@@ -148,22 +174,22 @@ impl Game {
             self.previous_state = self.target_state.clone();
             self.target_state = server_state.clone();
 
-            if self.player_idx.is_none_or(|p_idx| {
-                !(self.curr_state.players.contains_key(&p_idx)
-                    && self.previous_state.players.contains_key(&p_idx)
-                    && self.target_state.players.contains_key(&p_idx))
-            }) {
-                // self.target_state = server_state;
+            if self.player_idx.is_none() {
                 continue;
             };
 
-            let player_idx = self.player_idx.unwrap();
+            let Some(_) = self.player() else {
+                continue;
+            };
 
             let time_since_last_update = (Utc::now() - self.curr_state.timestamp).as_seconds_f64();
 
-            let player_x = self.curr_state.players.get(&player_idx).unwrap().x;
-
-            let x_diff = player_x - server_state.players.get(&player_idx).unwrap().x;
+            let x_diff = self.player().unwrap().x
+                - server_state
+                    .players
+                    .get(&self.player().unwrap().id)
+                    .unwrap()
+                    .x;
 
             let max_diff_x = time_since_last_update * MAX_UNITS_PER_SECOND;
 
@@ -177,34 +203,42 @@ impl Game {
                 x_diff
             };
 
+            let server_side_x = server_state
+                .players
+                .get(&self.player().unwrap().id)
+                .unwrap()
+                .x;
+
+            // Reconciliation
             self.curr_state
                 .players
-                .entry(player_idx)
-                .and_modify(|player| player.x = server_state.players.get(&player_idx).unwrap().x);
+                .get_mut(&self.player_idx.unwrap())
+                .unwrap()
+                .x = server_side_x + effective_diff_x;
 
-            self.curr_state.players.get_mut(&player_idx).unwrap().x += effective_diff_x;
-
-            if effective_diff_x.abs() > 0.01 {
-                // Send the move action
-                self.client
-                    .emit(
-                        ACTION_CHANNEL,
-                        Payload::Text(vec![serde_json::to_value(&Action::Player {
-                            id: player_idx,
-                            action: PlayerAction::Move {
-                                delta_x: effective_diff_x,
-                            },
-                        })
-                        .unwrap()]),
-                    )
-                    .unwrap();
-            }
+            // Send the move action
+            self.client
+                .emit(
+                    ACTION_CHANNEL,
+                    Payload::Text(vec![serde_json::to_value(&Action::Player {
+                        id: self.player().unwrap().id,
+                        action: PlayerAction::Move {
+                            delta_x: effective_diff_x,
+                        },
+                    })
+                    .unwrap()]),
+                )
+                .unwrap();
         }
     }
 
     fn join_update(&mut self) {
         while let Ok(join_response) = self.join_receiver.try_recv() {
             self.player_idx = Some(join_response.player_id);
+            self.curr_state.players.insert(
+                join_response.player_id,
+                Player::new(join_response.player_id),
+            );
             self.target_state.players.insert(
                 join_response.player_id,
                 Player::new(join_response.player_id),
