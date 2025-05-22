@@ -15,11 +15,6 @@ use crate::{
     STATE_CHANNEL,
 };
 
-struct MoveCommand {
-    uuid: Uuid,
-    delta_x: f32,
-}
-
 const SIMULATED_PING_MS: u64 = 150;
 
 pub struct Game {
@@ -30,7 +25,7 @@ pub struct Game {
     previous_state: State,
     pub player_idx: Option<usize>,
     client: Client,
-    unacknowledged: Vec<usize>,
+    unacknowledged: HashMap<Uuid, PlayerAction>,
 }
 
 impl Default for Game {
@@ -47,7 +42,7 @@ impl Game {
         let game = Self {
             state_receiver,
             join_receiver,
-            unacknowledged: vec![],
+            unacknowledged: HashMap::new(),
             curr_state: Default::default(),
             previous_state: Default::default(),
             target_state: Default::default(),
@@ -174,7 +169,7 @@ impl Game {
             self.previous_state = self.target_state.clone();
             self.target_state = server_state.clone();
 
-            if self.player_idx.is_none() {
+            let Some(player_idx) = self.player_idx else {
                 continue;
             };
 
@@ -217,16 +212,12 @@ impl Game {
                 .x = server_side_x + effective_diff_x;
 
             // Send the move action
+            let action = Action::player_move(player_idx, effective_diff_x);
+
             self.client
                 .emit(
                     ACTION_CHANNEL,
-                    Payload::Text(vec![serde_json::to_value(&Action::Player {
-                        id: self.player().unwrap().id,
-                        action: PlayerAction::Move {
-                            delta_x: effective_diff_x,
-                        },
-                    })
-                    .unwrap()]),
+                    Payload::Text(vec![serde_json::to_value(&action).unwrap()]),
                 )
                 .unwrap();
         }
