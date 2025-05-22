@@ -39,7 +39,7 @@ impl State {
     /// Update the timestamp of the game's last update
     pub fn tick(&mut self) -> String {
         self.timestamp = Utc::now();
-        let message = serde_json::to_string(self).unwrap();
+        let message = serde_json::to_string_pretty(self).unwrap();
         self.clear_ack();
         message
     }
