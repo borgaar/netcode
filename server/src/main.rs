@@ -82,12 +82,10 @@ async fn on_connect(socket: SocketRef, State(state): State<AppState>) {
         loop {
             {
                 let mut state = state.lock().unwrap();
-                state.tick();
-                let message = serde_json::to_string(&*state).unwrap();
+                let message = state.tick();
 
                 // Ignore error since we can just wait for the next state broadcast
                 let _ = socket.emit(STATE_CHANNEL, &message);
-                // state.clear_ack();
             }
 
             tokio::time::sleep(STATE_UPDATE_INTERVAL).await

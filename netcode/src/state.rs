@@ -37,8 +37,11 @@ pub enum StateError {
 
 impl State {
     /// Update the timestamp of the game's last update
-    pub fn tick(&mut self) {
+    pub fn tick(&mut self) -> String {
         self.timestamp = Utc::now();
+        let message = serde_json::to_string(self).unwrap();
+        self.clear_ack();
+        message
     }
 
     /// Clears acknowledged requests that are part of the current state,
