@@ -230,8 +230,6 @@ impl Game {
             // Send the move action
             let action = Action::player_move(player_idx, effective_diff_x);
 
-            println!("Sending action");
-
             self.client
                 .emit(
                     ACTION_CHANNEL,
