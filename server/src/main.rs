@@ -10,7 +10,7 @@ use std::{
 };
 
 /// Time between each tick update on the server's state
-const STATE_UPDATE_INTERVAL: Duration = Duration::from_millis(16);
+const STATE_UPDATE_INTERVAL: Duration = Duration::from_millis(500);
 
 /// Handles socket connections
 async fn on_connect(socket: SocketRef, State(state): State<AppState>) {

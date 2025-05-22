@@ -15,7 +15,7 @@ use crate::{
     STATE_CHANNEL,
 };
 
-const SIMULATED_PING_MS: u64 = 150;
+const SIMULATED_SEND_PING_MS: u64 = 1000;
 
 pub struct Game {
     state_receiver: Receiver<State>,
@@ -62,7 +62,7 @@ impl Game {
                         .unwrap();
                         let sender = state_sender.clone();
                         thread::spawn(move || {
-                            thread::sleep(std::time::Duration::from_millis(SIMULATED_PING_MS / 2));
+                            thread::sleep(std::time::Duration::from_millis(SIMULATED_SEND_PING_MS));
                             sender.send(data).unwrap();
                         });
                     }
@@ -78,7 +78,7 @@ impl Game {
                         .unwrap();
                         let sender = join_sender.clone();
                         thread::spawn(move || {
-                            thread::sleep(std::time::Duration::from_millis(SIMULATED_PING_MS / 2));
+                            thread::sleep(std::time::Duration::from_millis(SIMULATED_SEND_PING_MS));
                             sender.send(data).unwrap();
                         });
                     }
@@ -111,7 +111,7 @@ impl Game {
     fn calculate_interpolation_for_frame(&mut self) {
         let prev = self.previous_state.timestamp;
         let target = self.target_state.timestamp;
-        let curr = Utc::now() - TimeDelta::milliseconds(SIMULATED_PING_MS as _);
+        let curr = Utc::now();
         let t = (curr.min(target) - target).as_seconds_f64() / (target - prev).as_seconds_f64();
 
         let player_id = self.player_idx.unwrap_or(usize::MAX);
@@ -183,18 +183,16 @@ impl Game {
             self.unacknowledged
                 .retain(|key, _| server_state.acknowledged.get(key).is_none());
 
+            dbg!(&server_state.acknowledged);
+            dbg!(&self.unacknowledged);
+
             // Get the unacknowledged diff from the last update
             let unack_x_diff = self.get_unack_x_diff();
 
-            // Add unack_x_diff to the current player position
-            self.curr_state.players.get_mut(&player_idx).unwrap().x += unack_x_diff;
+            let new_relative_position =
+                server_state.players.get(&player_idx).unwrap().x + unack_x_diff;
 
-            let x_diff = self.player().unwrap().x
-                - server_state
-                    .players
-                    .get(&self.player().unwrap().id)
-                    .unwrap()
-                    .x;
+            let x_diff = self.player().unwrap().x - new_relative_position;
 
             let max_diff_x = time_since_last_update * MAX_UNITS_PER_SECOND;
 
@@ -208,6 +206,8 @@ impl Game {
                 x_diff
             };
 
+            dbg!(effective_diff_x);
+
             if effective_diff_x == 0.0 {
                 return;
             }
@@ -218,15 +218,19 @@ impl Game {
                 .unwrap()
                 .x;
 
+            dbg!(&server_state.players.get(&player_idx).unwrap());
+
             // Reconciliation
             self.curr_state
                 .players
                 .get_mut(&self.player_idx.unwrap())
                 .unwrap()
-                .x = server_side_x + effective_diff_x;
+                .x = server_side_x + unack_x_diff + effective_diff_x;
 
             // Send the move action
             let action = Action::player_move(player_idx, effective_diff_x);
+
+            println!("Sending action");
 
             self.client
                 .emit(
@@ -236,14 +240,9 @@ impl Game {
                 .unwrap();
 
             // Add the action to the unacknowledged actions
-            let uuid = Uuid::new_v4();
-            self.unacknowledged.insert(
-                uuid,
-                PlayerAction::Move {
-                    delta_x: effective_diff_x,
-                    id: uuid,
-                },
-            );
+            if let Some((id, action)) = action.ack_id() {
+                self.unacknowledged.insert(id, action);
+            }
         }
     }
 
