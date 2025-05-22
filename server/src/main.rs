@@ -84,6 +84,7 @@ async fn on_connect(socket: SocketRef, State(state): State<AppState>) {
 
                 // Ignore error since we can just wait for the next state broadcast
                 let _ = socket.emit(STATE_CHANNEL, &message);
+                state.clear_ack();
             }
 
             tokio::time::sleep(STATE_UPDATE_INTERVAL).await

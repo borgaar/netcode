@@ -40,6 +40,12 @@ impl State {
     pub fn tick(&mut self) {
         self.timestamp = Utc::now();
     }
+    
+    /// Clears acknowledged requests that are part of the current state,
+    /// to ensure no duplicate requests
+    pub fn clear_ack(&mut self) {
+        self.acknowledged.clear();
+    }
 
     /// Get a player by id. Returns [StateError::UnknownPlayer] if the player does not exist.
     fn player(&mut self, player_id: usize) -> Result<&mut Player, StateError> {
