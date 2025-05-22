@@ -10,7 +10,7 @@ use std::{
 };
 
 /// Time between each tick update on the server's state
-const STATE_UPDATE_INTERVAL: Duration = Duration::from_millis(500);
+const STATE_UPDATE_INTERVAL: Duration = Duration::from_millis(16);
 
 /// Handles socket connections
 async fn on_connect(socket: SocketRef, State(state): State<Arc<AppState>>) {
@@ -76,23 +76,21 @@ async fn on_connect(socket: SocketRef, State(state): State<Arc<AppState>>) {
         try_action(state.player_leave(user_id), socket);
     });
 
-    let global_state = state.clone();
-    tokio::spawn(async move {
-        let state = &global_state;
-        loop {
-            {
-                let mut state = state.lock().unwrap();
-                let message = state.tick();
-
-                dbg!(&message);
-
-                // Ignore error since we can just wait for the next state broadcast
-                let _ = socket.emit(STATE_CHANNEL, &message);
-            }
-
-            tokio::time::sleep(STATE_UPDATE_INTERVAL).await
-        }
-    });
+    // let global_state = state.clone();
+    // tokio::spawn(async move {
+    //     let state = &global_state;
+    //     loop {
+    //         {
+    //             let mut state = state.lock().unwrap();
+    //             let message = state.tick();
+    //
+    //             // Ignore error since we can just wait for the next state broadcast
+    //             let _ = socket.emit(STATE_CHANNEL, &message);
+    //         }
+    //
+    //         tokio::time::sleep(STATE_UPDATE_INTERVAL).await
+    //     }
+    // });
 }
 
 fn try_action(result: Result<(), netcode::state::StateError>, socket: SocketRef) {
@@ -112,7 +110,7 @@ async fn main() -> anyhow::Result<()> {
 
     let (layer, io) = SocketIo::builder().with_state(state.clone()).build_layer();
     io.ns("/", on_connect);
-    
+
     start_periodic_broadcast_to_namespace(io.clone(), state.clone());
 
     let app = axum::Router::new().layer(layer);
@@ -124,10 +122,7 @@ async fn main() -> anyhow::Result<()> {
 }
 
 // Alternative: Broadcast to specific namespace
-fn start_periodic_broadcast_to_namespace(
-    io: SocketIo,
-    state: Arc<AppState>,
-) {
+fn start_periodic_broadcast_to_namespace(io: SocketIo, state: Arc<AppState>) {
     tokio::spawn(async move {
         let mut interval = tokio::time::interval(STATE_UPDATE_INTERVAL);
 
@@ -135,10 +130,8 @@ fn start_periodic_broadcast_to_namespace(
             interval.tick().await;
 
             let message = state.state.lock().unwrap().tick();
-            
-            dbg!(&message);
 
-            if let Err(e) = io.of("/").unwrap().emit(STATE_CHANNEL, &message).await {
+            if let Err(e) = io.broadcast().emit(STATE_CHANNEL, &message).await {
                 eprintln!("Failed to broadcast to namespace /: {}", e);
             }
         }

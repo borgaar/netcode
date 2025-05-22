@@ -22,7 +22,7 @@ async fn main() -> anyhow::Result<()> {
     loop {
         draw_ground();
 
-        draw_players(&mut game.curr_state);
+        draw_players(&mut game.display_state);
 
         handle_keys(&mut game);
 
@@ -37,7 +37,7 @@ fn handle_key_press(key_codes: HashSet<KeyCode>, game: &mut Game) {
         match key {
             KeyCode::W => match game.player_idx {
                 Some(idx) => {
-                    if let Some(player) = game.curr_state.players.get(&idx) {
+                    if let Some(player) = game.display_state.players.get(&idx) {
                         if player.y() <= 0. {
                             game.jump();
                         }

@@ -11,16 +11,15 @@ use uuid::Uuid;
 use crate::{
     event::{JoinResponse, PlayerAction},
     state::Player,
-    Action, State, ACTION_CHANNEL, ERROR_CHANNEL, JOIN_CHANNEL, MAX_UNITS_PER_SECOND,
-    STATE_CHANNEL,
+    Action, State, ACTION_CHANNEL, ERROR_CHANNEL, JOIN_CHANNEL, STATE_CHANNEL,
 };
 
-const SIMULATED_SEND_PING_MS: u64 = 150;
+const SIMULATED_PING_MS: u64 = 400;
 
 pub struct Game {
     state_receiver: Receiver<State>,
     join_receiver: Receiver<JoinResponse>,
-    pub curr_state: State,
+    pub display_state: State,
     target_state: State,
     previous_state: State,
     pub player_idx: Option<usize>,
@@ -43,7 +42,7 @@ impl Game {
             state_receiver,
             join_receiver,
             unacknowledged: HashMap::new(),
-            curr_state: Default::default(),
+            display_state: Default::default(),
             previous_state: Default::default(),
             target_state: Default::default(),
             player_idx: None,
@@ -62,7 +61,7 @@ impl Game {
                         .unwrap();
                         let sender = state_sender.clone();
                         thread::spawn(move || {
-                            thread::sleep(std::time::Duration::from_millis(SIMULATED_SEND_PING_MS));
+                            thread::sleep(std::time::Duration::from_millis(SIMULATED_PING_MS / 2));
                             sender.send(data).unwrap();
                         });
                     }
@@ -78,7 +77,7 @@ impl Game {
                         .unwrap();
                         let sender = join_sender.clone();
                         thread::spawn(move || {
-                            thread::sleep(std::time::Duration::from_millis(SIMULATED_SEND_PING_MS));
+                            thread::sleep(std::time::Duration::from_millis(SIMULATED_PING_MS));
                             sender.send(data).unwrap();
                         });
                     }
@@ -111,13 +110,14 @@ impl Game {
     fn calculate_interpolation_for_frame(&mut self) {
         let prev = self.previous_state.timestamp;
         let target = self.target_state.timestamp;
-        let curr = Utc::now();
+        // ping / 2
+        let curr = Utc::now() - TimeDelta::milliseconds((SIMULATED_PING_MS / 2) as i64);
         let t = (curr - target).as_seconds_f64() / (target - prev).as_seconds_f64();
 
         let player_id = self.player_idx.unwrap_or(usize::MAX);
 
         let self_player = self
-            .curr_state
+            .display_state
             .players
             .get(&player_id)
             .or_else(|| self.target_state.players.get(&player_id));
@@ -150,106 +150,96 @@ impl Game {
             })
             .collect::<HashMap<_, _>>();
 
-        self.curr_state.players = new_curr_players;
-    }
-
-    fn player(&self) -> Option<&Player> {
-        let Some(player_idx) = self.player_idx else {
-            return None;
-        };
-
-        self.curr_state.players.get(&player_idx)
+        self.display_state.players = new_curr_players;
     }
 
     fn state_update(&mut self) {
-        self.calculate_interpolation_for_frame();
-
         for server_state in self.state_receiver.try_iter() {
-            // server update
             self.previous_state = self.target_state.clone();
             self.target_state = server_state.clone();
 
-            let Some(player_idx) = self.player_idx else {
+            let Some(player_id) = self.player_idx else {
                 continue;
             };
 
-            let Some(_) = self.player() else {
+            let Some(current_player) = self.display_state.players.get(&player_id) else {
                 continue;
             };
 
-            let time_since_last_update = (Utc::now() - self.curr_state.timestamp).as_seconds_f64();
+            // Print length of server play list
+            dbg!(server_state.players.len());
+
+            // print length of unacknowledged actions
+            dbg!(self.unacknowledged.len());
 
             // Remove acknowledged actions
             self.unacknowledged
                 .retain(|key, _| server_state.acknowledged.get(key).is_none());
 
-            dbg!(&server_state.acknowledged);
-            dbg!(&self
-                .unacknowledged
-                .iter()
-                .map(|(key, _)| key)
-                .collect::<Vec<_>>());
-            println!("\n\n\n");
-
             // Get the unacknowledged diff from the last update
-            let unack_x_diff = self.get_unack_x_diff();
+            let unacknowledged_x_diff = self.get_unack_x_diff();
 
-            let new_relative_position =
-                server_state.players.get(&player_idx).unwrap().x + unack_x_diff;
-
-            let x_diff = self.player().unwrap().x - new_relative_position;
-
-            let max_diff_x = time_since_last_update * MAX_UNITS_PER_SECOND;
-
-            let effective_diff_x = if x_diff.abs() > max_diff_x.abs() {
-                if x_diff.is_sign_negative() {
-                    -max_diff_x
-                } else {
-                    max_diff_x
-                }
-            } else {
-                x_diff
+            // Get the server's position for this player
+            let Some(server_player) = server_state.players.get(&player_id) else {
+                continue;
             };
 
-            if effective_diff_x.abs() <= 1.0 {
+            // The server's position plus what has been unacknowledged (sent but not yet processed)
+            let reconciled_position = server_player.x + unacknowledged_x_diff;
+
+            // movement since last sent position change
+            let position_discrepancy = current_player.x - reconciled_position;
+
+            // Get the jump time from display state
+            let local_last_jump_at = current_player
+                .last_jump_at
+                .unwrap_or_else(|| Utc::now() - TimeDelta::milliseconds(1000));
+
+            // Update the display state with the state from the server
+            self.display_state = server_state.clone();
+
+            // Update the display position and jump time to the reconciled+predicted position
+            if let Some(player) = self.display_state.players.get_mut(&player_id) {
+                player.x = reconciled_position + position_discrepancy;
+                player.last_jump_at = Some(local_last_jump_at);
+                dbg!(player.x);
+                dbg!(server_state.players.get(&player_id).unwrap().x);
+                dbg!(reconciled_position);
+                dbg!(position_discrepancy);
+                println!("\n\n\n\n\n")
+            }
+
+            // Check if the discrepancy is significant enough to send new move
+            if position_discrepancy.abs() < 0.01 {
                 return;
             }
 
-            let server_side_x = server_state
-                .players
-                .get(&self.player().unwrap().id)
-                .unwrap()
-                .x;
+            let action = Action::player_move(player_id, position_discrepancy);
 
-            // Reconciliation
-            self.curr_state
-                .players
-                .get_mut(&self.player_idx.unwrap())
-                .unwrap()
-                .x = server_side_x + effective_diff_x + unack_x_diff;
-
-            // Send the move action
-            let action = Action::player_move(player_idx, effective_diff_x);
-
-            self.client
-                .emit(
-                    ACTION_CHANNEL,
-                    Payload::Text(vec![serde_json::to_value(&action).unwrap()]),
-                )
-                .unwrap();
-
-            // Add the action to the unacknowledged actions
-            if let Some((id, action)) = action.ack_id() {
-                self.unacknowledged.insert(id, action);
+            // Add the action to the unacknowledged actions and send
+            if let Some((id, player_action)) = action.ack_id() {
+                let client_clone = self.client.clone();
+                thread::spawn(move || {
+                    thread::sleep(std::time::Duration::from_millis(SIMULATED_PING_MS / 2));
+                    client_clone
+                        .emit(
+                            ACTION_CHANNEL,
+                            Payload::Text(vec![serde_json::to_value(&action).unwrap()]),
+                        )
+                        .unwrap();
+                });
+                self.unacknowledged.insert(id, player_action);
             }
         }
+
+        self.calculate_interpolation_for_frame();
     }
 
     fn get_unack_x_diff(&self) -> f64 {
         let mut x_diff = 0.0;
         for action in self.unacknowledged.values() {
             match action {
-                PlayerAction::Move { delta_x, id } => {
+                PlayerAction::Move { delta_x, id: _ } => {
                     x_diff += *delta_x;
                 }
                 PlayerAction::Jump { at: _ } => {}
@@ -261,7 +251,7 @@ impl Game {
     fn join_update(&mut self) {
         for join_response in self.join_receiver.try_iter() {
             self.player_idx = Some(join_response.player_id);
-            self.curr_state.players.insert(
+            self.display_state.players.insert(
                 join_response.player_id,
                 Player::new(join_response.player_id),
             );
@@ -274,22 +264,26 @@ impl Game {
     pub fn jump(&mut self) {
         if let Some(player_idx) = self.player_idx {
             // Optimistic update
-            self.curr_state
+            self.display_state
                 .players
                 .get_mut(&player_idx)
                 .unwrap()
                 .last_jump_at = Some(chrono::Utc::now());
 
-            self.client
-                .emit(
-                    ACTION_CHANNEL,
-                    Payload::Text(vec![serde_json::to_value(&Action::Player {
-                        id: player_idx,
-                        action: PlayerAction::Jump { at: Utc::now() },
-                    })
-                    .unwrap()]),
-                )
-                .unwrap();
+            let client_clone = self.client.clone();
+            thread::spawn(move || {
+                thread::sleep(std::time::Duration::from_millis(SIMULATED_PING_MS / 2));
+                client_clone
+                    .emit(
+                        ACTION_CHANNEL,
+                        Payload::Text(vec![serde_json::to_value(&Action::Player {
+                            id: player_idx,
+                            action: PlayerAction::Jump { at: Utc::now() },
+                        })
+                        .unwrap()]),
+                    )
+                    .unwrap();
+            });
         }
     }
     pub fn move_player(&mut self, delta_x: f32) {
@@ -298,7 +292,7 @@ impl Game {
         };
 
         // Optimistic update
-        self.curr_state.players.get_mut(&player_idx).unwrap().x += delta_x as f64;
+        self.display_state.players.get_mut(&player_idx).unwrap().x += delta_x as f64;
     }
 }
 
