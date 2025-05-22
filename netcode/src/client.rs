@@ -4,7 +4,7 @@ use std::{
     thread, usize,
 };
 
-use chrono::Utc;
+use chrono::{TimeDelta, Utc};
 use rust_socketio::{client::Client, ClientBuilder, Payload};
 use uuid::Uuid;
 
@@ -111,8 +111,8 @@ impl Game {
     fn calculate_interpolation_for_frame(&mut self) {
         let prev = self.previous_state.timestamp;
         let target = self.target_state.timestamp;
-        let curr = Utc::now();
-        let t = (curr - target).as_seconds_f64() / (target - prev).as_seconds_f64();
+        let curr = Utc::now() - TimeDelta::milliseconds(SIMULATED_PING_MS as _);
+        let t = (curr.min(target) - target).as_seconds_f64() / (target - prev).as_seconds_f64();
 
         let player_id = self.player_idx.unwrap_or(usize::MAX);
 
