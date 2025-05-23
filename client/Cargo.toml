@@ -4,7 +4,7 @@ version = "0.1.0"
 edition = "2021"
 
 [dependencies]
-macroquad = "0.4.14"
+macroquad = { version = "0.4.14", features = ["audio"] }
 rust_socketio = "0.6.0"
 anyhow = {workspace = true}
 serde = { workspace = true }
