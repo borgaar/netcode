@@ -17,7 +17,6 @@ mod ui;
 #[macroquad::main("BasicShapes")]
 async fn main() -> anyhow::Result<()> {
     let mut game = Game::new();
-    let mut simulated_ping: u64 = 0;
 
     let font = include_bytes!("./font.ttf");
 
@@ -71,9 +70,9 @@ async fn main() -> anyhow::Result<()> {
 
         draw_players(&mut game.display_state);
 
-        handle_keys(&mut game, &mut simulated_ping);
+        handle_keys(&mut game);
 
-        draw_ui(&mut game, simulated_ping, &label_skin, &active_skin, &inactive_skin);
+        draw_ui(&mut game, &label_skin, &active_skin, &inactive_skin);
 
         game.update();
 
@@ -81,7 +80,7 @@ async fn main() -> anyhow::Result<()> {
     }
 }
 
-fn handle_key_press(key_codes: HashSet<KeyCode>, game: &mut Game, simulated_ping: &mut u64) {
+fn handle_key_press(key_codes: HashSet<KeyCode>, game: &mut Game) {
     for key in key_codes {
         match key {
             KeyCode::W => match game.player_idx {
@@ -100,12 +99,12 @@ fn handle_key_press(key_codes: HashSet<KeyCode>, game: &mut Game, simulated_ping
                 }
             },
             KeyCode::J => {
-                let new_ping = simulated_ping.checked_sub(10).unwrap_or(0);
-                *simulated_ping = game.set_simulated_ping(new_ping);
+                let new_ping = game.ping_cache.checked_sub(10).unwrap_or(0);
+                game.set_simulated_ping(new_ping);
             },
-            KeyCode::J => {
-                let new_ping = *simulated_ping + 10;
-                *simulated_ping = game.set_simulated_ping(new_ping);
+            KeyCode::K => {
+                let new_ping = game.ping_cache + 10;
+                game.set_simulated_ping(new_ping);
             },
             KeyCode::P => {
                 game.prediction = !game.prediction;
@@ -121,12 +120,12 @@ fn handle_key_press(key_codes: HashSet<KeyCode>, game: &mut Game, simulated_ping
     }
 }
 
-fn handle_keys(game: &mut Game, simulated_ping: &mut u64) {
+fn handle_keys(game: &mut Game) {
     let keys_down = get_keys_down();
     handle_key_hold(keys_down, game);
 
     let keys_pressed = get_keys_pressed();
-    handle_key_press(keys_pressed, game, simulated_ping);
+    handle_key_press(keys_pressed, game);
 }
 
 fn handle_key_hold(key_codes: HashSet<KeyCode>, game: &mut Game) {

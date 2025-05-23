@@ -27,7 +27,7 @@ pub struct Game {
     client: Client,
     unacknowledged: HashMap<Uuid, PlayerAction>,
     simulated_ping: Arc<Mutex<u64>>,
-    ping_cache: u64,
+    pub ping_cache: u64,
     pub prediction: bool,
     pub reconciliation: bool,
     pub interpolation: bool,
@@ -76,7 +76,7 @@ impl Game {
         self.state_update();
         self.join_update();
     }
-    
+
     fn calculate_interpolation_for_frame(&mut self) {
         let prev = self.previous_state.timestamp;
         let target = self.target_state.timestamp;
@@ -133,7 +133,9 @@ impl Game {
             self.target_state = server_state.clone();
 
             // Update ping
-            self.ping_cache = self.simulated_ping.lock().unwrap().clone();
+            {
+                self.ping_cache = self.simulated_ping.lock().unwrap().clone();
+            }
 
             // Get the current player
             let current_player = match self.get_player() {
@@ -183,9 +185,9 @@ impl Game {
             // Add the action to the unacknowledged actions and send
             if let Some((id, player_action)) = action.ack_id() {
                 let client_clone = self.client.clone();
-                let ping = self.simulated_ping.clone();
+                let ping_cache = self.ping_cache;
                 thread::spawn(move || {
-                    thread::sleep(std::time::Duration::from_millis(*ping.lock().unwrap() / 2));
+                    thread::sleep(std::time::Duration::from_millis(ping_cache / 2));
                     client_clone
                         .emit(
                             ACTION_CHANNEL,
@@ -226,7 +228,7 @@ impl Game {
             );
         }
     }
-    
+
     pub fn jump(&mut self) {
         if let Some(player_idx) = self.player_idx {
             // Optimistic update
@@ -240,8 +242,9 @@ impl Game {
             let ping = self.simulated_ping.clone();
 
             // Spawn thread to simulate network delay
+            let ping_cache = self.ping_cache;
             thread::spawn(move || {
-                thread::sleep(std::time::Duration::from_millis(*ping.lock().unwrap() / 2));
+                thread::sleep(std::time::Duration::from_millis(ping_cache / 2));
                 client_clone
                     .emit(
                         ACTION_CHANNEL,
@@ -293,7 +296,11 @@ fn build_netcode_client(
                 let sender = state_sender.clone();
                 let ping = state_ping.clone();
                 thread::spawn(move || {
-                    thread::sleep(std::time::Duration::from_millis(*ping.lock().unwrap() / 2));
+                    let ping = {
+                        *ping.lock().unwrap()
+                    };
+                    
+                    thread::sleep(std::time::Duration::from_millis(ping / 2));
                     sender.send(data).unwrap();
                 });
             }
@@ -309,8 +316,13 @@ fn build_netcode_client(
                 .unwrap();
                 let sender = join_sender.clone();
                 let ping = join_ping.clone();
+                
+                let ping = {
+                    *ping.lock().unwrap()
+                };
+                
                 thread::spawn(move || {
-                    thread::sleep(std::time::Duration::from_millis(*ping.lock().unwrap() / 2));
+                    thread::sleep(std::time::Duration::from_millis(ping / 2));
                     sender.send(data).unwrap();
                 });
             }

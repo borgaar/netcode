@@ -12,7 +12,6 @@ use netcode::client::Game;
 
 pub fn draw_ui(
     game: &mut Game,
-    simulated_ping: u64,
     label_skin: &Skin,
     active_skin: &Skin,
     inactive_skin: &Skin,
@@ -28,7 +27,7 @@ pub fn draw_ui(
     root_ui().pop_skin();
     root_ui().push_skin(&label_skin);
 
-    Label::new(format!("Ping {:?}ms", simulated_ping))
+    Label::new(format!("Ping {:?}ms", game.ping_cache))
         .position(Vec2 { x: 15., y: 15. })
         .ui(&mut root_ui());
 
