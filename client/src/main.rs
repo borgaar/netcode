@@ -108,6 +108,7 @@ fn handle_key_press(key_codes: HashSet<KeyCode>, game: &mut Game) {
             },
             KeyCode::P => {
                 game.prediction = !game.prediction;
+                game.reconciliation = true;
             },
             KeyCode::I => {
                 game.interpolation = !game.interpolation;
