@@ -16,7 +16,6 @@ pub fn draw_ui(
     active_skin: &Skin,
     inactive_skin: &Skin,
 ) {
-    let instant = std::time::Instant::now();
     let Game {
         interpolation,
         reconciliation,
@@ -45,8 +44,6 @@ pub fn draw_ui(
     Label::new(format!("Interpolation"))
         .position(Vec2 { x: 500., y: 15. })
         .ui(&mut root_ui());
-
-    dbg!(instant.elapsed());
 }
 
 fn change_style(condition: bool, active_skin: &Skin, inactive_skin: &Skin) {
