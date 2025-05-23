@@ -18,6 +18,8 @@ async fn on_connect(socket: SocketRef, State(state): State<Arc<AppState>>) {
     let user_id = Arc::new(Mutex::new(0));
 
     let socket_state = state.clone();
+    
+    println!("new client connected");
 
     let socket_user_id = user_id.clone();
     socket.on(
@@ -37,7 +39,9 @@ async fn on_connect(socket: SocketRef, State(state): State<Arc<AppState>>) {
             };
 
             {
+                println!("Acquiring lock");
                 let mut state = socket_state.lock().unwrap();
+                println!("Lock acquired");
 
                 match event {
                     netcode::Action::Join => {
@@ -75,22 +79,6 @@ async fn on_connect(socket: SocketRef, State(state): State<Arc<AppState>>) {
         let mut state = disconnect_state.lock().unwrap();
         try_action(state.player_leave(user_id), socket);
     });
-
-    // let global_state = state.clone();
-    // tokio::spawn(async move {
-    //     let state = &global_state;
-    //     loop {
-    //         {
-    //             let mut state = state.lock().unwrap();
-    //             let message = state.tick();
-    //
-    //             // Ignore error since we can just wait for the next state broadcast
-    //             let _ = socket.emit(STATE_CHANNEL, &message);
-    //         }
-    //
-    //         tokio::time::sleep(STATE_UPDATE_INTERVAL).await
-    //     }
-    // });
 }
 
 fn try_action(result: Result<(), netcode::state::StateError>, socket: SocketRef) {
@@ -112,6 +100,22 @@ async fn main() -> anyhow::Result<()> {
     io.ns("/", on_connect);
 
     start_periodic_broadcast_to_namespace(io.clone(), state.clone());
+    let global_state = state.clone();
+
+    tokio::spawn(async move {
+        let state = &global_state;
+        loop {
+            {
+                let message = global_state.state.lock().unwrap().tick();
+                dbg!(&message);
+                let _ = io.emit(STATE_CHANNEL, &message).await;
+            }
+
+            tokio::time::sleep(STATE_UPDATE_INTERVAL).await
+        }
+    });
+    
+    println!("Creating router");
 
     let app = axum::Router::new().layer(layer);
 

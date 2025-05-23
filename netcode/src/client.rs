@@ -28,6 +28,9 @@ pub struct Game {
     unacknowledged: HashMap<Uuid, PlayerAction>,
     simulated_ping: Arc<Mutex<u64>>,
     ping_cache: u64,
+    pub prediction: bool,
+    pub reconciliation: bool,
+    pub interpolation: bool,
 }
 
 impl Default for Game {
@@ -54,6 +57,9 @@ impl Game {
             client: build_netcode_client(state_sender, join_sender, simulated_ping.clone()),
             simulated_ping,
             ping_cache: 0,
+            prediction: false,
+            reconciliation: false,
+            interpolation: false,
         };
 
         game
@@ -70,7 +76,7 @@ impl Game {
         self.state_update();
         self.join_update();
     }
-
+    
     fn calculate_interpolation_for_frame(&mut self) {
         let prev = self.previous_state.timestamp;
         let target = self.target_state.timestamp;
@@ -220,6 +226,7 @@ impl Game {
             );
         }
     }
+    
     pub fn jump(&mut self) {
         if let Some(player_idx) = self.player_idx {
             // Optimistic update
