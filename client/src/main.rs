@@ -1,7 +1,12 @@
-use std::collections::HashSet;
+use std::{collections::HashSet, ops::Not};
 
 use macroquad::{
-    color::{Color, BLUE, GREEN, PURPLE, RED, YELLOW}, input::{get_keys_down, get_keys_pressed, KeyCode}, shapes::draw_rectangle, time::get_frame_time, ui::{root_ui, Skin}, window::{next_frame, screen_height, screen_width}
+    color::{Color, BLUE, GREEN, PURPLE, RED, YELLOW},
+    input::{get_keys_down, get_keys_pressed, KeyCode},
+    shapes::draw_rectangle,
+    time::get_frame_time,
+    ui::{root_ui, Skin},
+    window::{next_frame, screen_height, screen_width},
 };
 use netcode::{client::Game, State, MAX_UNITS_PER_SECOND};
 use ui::draw_ui;
@@ -43,21 +48,21 @@ async fn main() -> anyhow::Result<()> {
         .text_color(Color::from_hex(0x6A994E))
         .font_size(24)
         .build();
-    
+
     let label_skin = {
         Skin {
             label_style,
             ..root_ui().default_skin()
         }
     };
-    
+
     let active_skin = {
         Skin {
             label_style: active_style,
             ..root_ui().default_skin()
         }
     };
-    
+
     let inactive_skin = {
         Skin {
             label_style: inactive_style,
@@ -97,24 +102,29 @@ fn handle_key_press(key_codes: HashSet<KeyCode>, game: &mut Game) {
                 if let None = game.player_idx {
                     game.join();
                 }
-            },
+            }
             KeyCode::J => {
                 let new_ping = game.ping_cache.checked_sub(10).unwrap_or(0);
                 game.set_simulated_ping(new_ping);
-            },
+            }
             KeyCode::K => {
                 let new_ping = game.ping_cache + 10;
                 game.set_simulated_ping(new_ping);
-            },
+            }
             KeyCode::P => {
                 game.prediction = !game.prediction;
-                game.reconciliation = true;
-            },
+                if !game.prediction {
+                    game.reconciliation = false;
+                }
+            }
             KeyCode::I => {
                 game.interpolation = !game.interpolation;
-            },
+            }
             KeyCode::R => {
                 game.reconciliation = !game.reconciliation;
+                if !game.prediction {
+                    game.prediction = true
+                }
             }
             _ => {}
         }
