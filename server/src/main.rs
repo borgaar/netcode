@@ -102,19 +102,6 @@ async fn main() -> anyhow::Result<()> {
     start_periodic_broadcast_to_namespace(io.clone(), state.clone());
     let global_state = state.clone();
 
-    tokio::spawn(async move {
-        let state = &global_state;
-        loop {
-            {
-                let message = global_state.state.lock().unwrap().tick();
-                dbg!(&message);
-                let _ = io.emit(STATE_CHANNEL, &message).await;
-            }
-
-            tokio::time::sleep(STATE_UPDATE_INTERVAL).await
-        }
-    });
-    
     println!("Creating router");
 
     let app = axum::Router::new().layer(layer);
