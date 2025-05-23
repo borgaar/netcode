@@ -27,6 +27,7 @@ pub struct Game {
     client: Client,
     unacknowledged: HashMap<Uuid, PlayerAction>,
     simulated_ping: Arc<Mutex<u64>>,
+    ping_cache: u64,
 }
 
 impl Default for Game {
@@ -40,7 +41,7 @@ impl Game {
         let (state_sender, state_receiver) = channel::<State>();
         let (join_sender, join_receiver) = channel::<JoinResponse>();
 
-        let simulated_ping = Arc::new(Mutex::new(0));
+        let simulated_ping = Arc::new(Mutex::new(150));
 
         let game = Self {
             state_receiver,
@@ -52,6 +53,7 @@ impl Game {
             player_idx: None,
             client: build_netcode_client(state_sender, join_sender, simulated_ping.clone()),
             simulated_ping,
+            ping_cache: 0,
         };
 
         game
@@ -72,8 +74,7 @@ impl Game {
     fn calculate_interpolation_for_frame(&mut self) {
         let prev = self.previous_state.timestamp;
         let target = self.target_state.timestamp;
-        let curr =
-            Utc::now() - TimeDelta::milliseconds((*self.simulated_ping.lock().unwrap() / 2) as i64);
+        let curr = Utc::now() - TimeDelta::milliseconds((self.ping_cache / 2) as i64);
         let t = (curr - target).as_seconds_f64() / (target - prev).as_seconds_f64();
 
         let player_id = self.player_idx.unwrap_or(usize::MAX);
@@ -125,17 +126,14 @@ impl Game {
             self.previous_state = self.target_state.clone();
             self.target_state = server_state.clone();
 
+            // Update ping
+            self.ping_cache = self.simulated_ping.lock().unwrap().clone();
+
             // Get the current player
             let current_player = match self.get_player() {
                 Some(player) => player.clone(),
                 None => continue,
             };
-
-            // Print length of server play list
-            dbg!(server_state.players.len());
-
-            // print length of unacknowledged actions
-            dbg!(self.unacknowledged.len());
 
             // Remove acknowledged actions
             self.unacknowledged
@@ -167,11 +165,6 @@ impl Game {
             if let Some(player) = self.display_state.players.get_mut(&current_player.id) {
                 player.x = reconciled_position + position_discrepancy;
                 player.last_jump_at = Some(local_last_jump_at);
-                dbg!(player.x);
-                dbg!(server_state.players.get(&current_player.id).unwrap().x);
-                dbg!(reconciled_position);
-                dbg!(position_discrepancy);
-                println!("\n\n\n\n\n")
             }
 
             // Check if the discrepancy is significant enough to send new move
@@ -238,6 +231,8 @@ impl Game {
 
             let client_clone = self.client.clone();
             let ping = self.simulated_ping.clone();
+
+            // Spawn thread to simulate network delay
             thread::spawn(move || {
                 thread::sleep(std::time::Duration::from_millis(*ping.lock().unwrap() / 2));
                 client_clone
