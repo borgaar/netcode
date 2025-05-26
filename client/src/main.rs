@@ -9,7 +9,7 @@ use macroquad::{
     shapes::draw_rectangle,
     time::get_frame_time,
     ui::{root_ui, Skin},
-    window::{next_frame, screen_height, screen_width},
+    window::{next_frame, request_new_screen_size, screen_height, screen_width},
 };
 use netcode::{client::Game, MAX_UNITS_PER_SECOND};
 use ui::draw_ui;
@@ -88,6 +88,8 @@ async fn main() -> anyhow::Result<()> {
             ..root_ui().default_skin()
         }
     };
+
+    request_new_screen_size(1600., 900.);
 
     loop {
         draw_ground();

@@ -29,7 +29,7 @@ pub struct Game {
     pub display_state: State,
     pub player_idx: Option<usize>,
     client: Client,
-    unacknowledged: HashMap<Uuid, PlayerAction>,
+    pub unacknowledged: HashMap<Uuid, PlayerAction>,
     simulated_ping: Arc<Mutex<u64>>,
     pub ping_cache: u64,
     pub prediction: bool,
