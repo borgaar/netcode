@@ -12,7 +12,7 @@ use std::{
 };
 
 /// Time between each tick update on the server's state
-const STATE_UPDATE_INTERVAL: Duration = Duration::from_millis(250);
+const STATE_UPDATE_INTERVAL: Duration = Duration::from_millis(333);
 
 /// Handles incoming socket connections from clients
 async fn on_connect(socket: SocketRef, State(state): State<Arc<AppState>>) {
@@ -20,7 +20,7 @@ async fn on_connect(socket: SocketRef, State(state): State<Arc<AppState>>) {
     let user_id = Arc::new(Mutex::new(0));
 
     let socket_state = state.clone();
-    
+
     println!("new client connected");
 
     let socket_user_id = user_id.clone();
@@ -104,7 +104,6 @@ async fn main() -> anyhow::Result<()> {
     io.ns("/", on_connect);
 
     start_periodic_broadcast_to_namespace(io.clone(), state.clone());
-    let global_state = state.clone();
 
     println!("Creating router");
 

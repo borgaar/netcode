@@ -23,9 +23,10 @@ use crate::{
 pub struct Game {
     state_receiver: Receiver<State>,
     join_receiver: Receiver<JoinResponse>,
-    pub display_state: State,
+    pub local_state: State,
     target_state: State,
     previous_state: State,
+    pub display_state: State,
     pub player_idx: Option<usize>,
     client: Client,
     unacknowledged: HashMap<Uuid, PlayerAction>,
@@ -48,27 +49,28 @@ impl Game {
         let (state_sender, state_receiver) = channel::<State>();
         let (join_sender, join_receiver) = channel::<JoinResponse>();
 
-        let simulated_ping = Arc::new(Mutex::new(150));
+        let simulated_ping = Arc::new(Mutex::new(250));
 
         let game = Self {
             state_receiver,
             join_receiver,
             unacknowledged: HashMap::new(),
-            display_state: Default::default(),
+            local_state: Default::default(),
             previous_state: Default::default(),
             target_state: Default::default(),
+            display_state: Default::default(),
             player_idx: None,
             client: build_netcode_client(state_sender, join_sender, simulated_ping.clone()),
             simulated_ping,
             ping_cache: 0,
-            prediction: false,
-            reconciliation: false,
-            interpolation: false,
+            prediction: true,
+            reconciliation: true,
+            interpolation: true,
         };
 
         game
     }
-    
+
     /// Join the server-side game.
     /// Make sure to only call this function once, as any future calls result in multiple sessions.
     pub fn join(&self) {
@@ -79,7 +81,7 @@ impl Game {
             eprintln!("Failed to join the game");
         };
     }
-    
+
     /// Tick the game's state. Should be called every frame.
     pub fn update(&mut self) {
         self.state_update();
@@ -96,18 +98,18 @@ impl Game {
         let player_id = self.player_idx.unwrap_or(usize::MAX);
 
         let self_player = self
-            .display_state
+            .local_state
             .players
             .get(&player_id)
             .or_else(|| self.target_state.players.get(&player_id));
 
-        let new_curr_players = self
+        let mut new_curr_players = self
             .target_state
             .players
             .iter()
             .map(|(tar_player_id, tar_player)| {
                 if *tar_player_id == player_id && self_player.is_some() {
-                    return (self_player.unwrap().id, self_player.unwrap().clone());
+                    return (*tar_player_id, self_player.unwrap().clone());
                 }
 
                 let prev_player = self
@@ -129,6 +131,11 @@ impl Game {
             })
             .collect::<HashMap<_, _>>();
 
+        self.local_state.players = new_curr_players.clone();
+        let display_player = self.display_state.players.get(&player_id);
+        if let Some(display_player) = display_player {
+            new_curr_players.insert(player_id, display_player.clone());
+        }
         self.display_state.players = new_curr_players;
     }
 
@@ -136,7 +143,7 @@ impl Game {
     /// May be [None] if no current player (not yet joined)
     fn get_player(&self) -> Option<&Player> {
         let player_id = self.player_idx?;
-        self.display_state.players.get(&player_id)
+        self.local_state.players.get(&player_id)
     }
 
     /// Handles updating the state of an active game.
@@ -153,7 +160,12 @@ impl Game {
             // Get the current player
             let current_player = match self.get_player() {
                 Some(player) => player.clone(),
-                None => continue,
+                None => {
+                    // Update display state and continue
+                    self.local_state = server_state.clone();
+                    self.display_state = self.local_state.clone();
+                    continue;
+                }
             };
 
             // Remove acknowledged actions
@@ -179,13 +191,22 @@ impl Game {
                 .last_jump_at
                 .unwrap_or_else(|| Utc::now() - TimeDelta::milliseconds(1000));
 
-            // Update the display state with the state from the server
-            self.display_state = server_state.clone();
+            // Update the local state with the state from the server
+            self.local_state = server_state.clone();
+            self.display_state = self.previous_state.clone();
 
             // Update the display position and jump time to the reconciled+predicted position
-            if let Some(player) = self.display_state.players.get_mut(&current_player.id) {
+            if let Some(player) = self.local_state.players.get_mut(&current_player.id) {
                 player.x = reconciled_position + position_discrepancy;
                 player.last_jump_at = Some(local_last_jump_at);
+                if self.reconciliation {
+                    if let Some(display_player) =
+                        self.display_state.players.get_mut(&current_player.id)
+                    {
+                        display_player.x = reconciled_position + position_discrepancy;
+                        display_player.last_jump_at = Some(local_last_jump_at);
+                    }
+                }
             }
 
             // Check if the discrepancy is significant enough to send new move
@@ -212,7 +233,9 @@ impl Game {
             }
         }
 
-        self.calculate_interpolation_for_frame();
+        if self.interpolation {
+            self.calculate_interpolation_for_frame();
+        }
     }
 
     /// Get the total delta_x not accounted for by the received server state.
@@ -233,7 +256,7 @@ impl Game {
     fn join_update(&mut self) {
         for join_response in self.join_receiver.try_iter() {
             self.player_idx = Some(join_response.player_id);
-            self.display_state.players.insert(
+            self.local_state.players.insert(
                 join_response.player_id,
                 Player::new(join_response.player_id),
             );
@@ -248,14 +271,21 @@ impl Game {
     pub fn jump(&mut self) {
         if let Some(player_idx) = self.player_idx {
             // Optimistic update
-            self.display_state
+            self.local_state
                 .players
                 .get_mut(&player_idx)
                 .unwrap()
                 .last_jump_at = Some(chrono::Utc::now());
 
+            if self.prediction {
+                self.display_state
+                    .players
+                    .get_mut(&player_idx)
+                    .unwrap()
+                    .last_jump_at = Some(chrono::Utc::now());
+            }
+
             let client_clone = self.client.clone();
-            let ping = self.simulated_ping.clone();
 
             // Spawn thread to simulate network delay
             let ping_cache = self.ping_cache;
@@ -274,7 +304,7 @@ impl Game {
             });
         }
     }
-    
+
     /// Makes the current player move by [delta_x] units
     pub fn move_player(&mut self, delta_x: f32) {
         let Some(player_idx) = self.player_idx else {
@@ -282,7 +312,12 @@ impl Game {
         };
 
         // Optimistic update
-        self.display_state.players.get_mut(&player_idx).unwrap().x += delta_x as f64;
+        self.local_state.players.get_mut(&player_idx).unwrap().x += delta_x as f64;
+        if self.prediction {
+            if let Some(display_player) = self.display_state.players.get_mut(&player_idx) {
+                display_player.x += delta_x as f64;
+            }
+        }
     }
 
     /// Update the game's simulated ping amount to check for network issues.
@@ -316,10 +351,8 @@ fn build_netcode_client(
                 let sender = state_sender.clone();
                 let ping = state_ping.clone();
                 thread::spawn(move || {
-                    let ping = {
-                        *ping.lock().unwrap()
-                    };
-                    
+                    let ping = { *ping.lock().unwrap() };
+
                     thread::sleep(std::time::Duration::from_millis(ping / 2));
                     sender.send(data).unwrap();
                 });
@@ -336,11 +369,9 @@ fn build_netcode_client(
                 .unwrap();
                 let sender = join_sender.clone();
                 let ping = join_ping.clone();
-                
-                let ping = {
-                    *ping.lock().unwrap()
-                };
-                
+
+                let ping = { *ping.lock().unwrap() };
+
                 thread::spawn(move || {
                     thread::sleep(std::time::Duration::from_millis(ping / 2));
                     sender.send(data).unwrap();

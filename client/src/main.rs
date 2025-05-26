@@ -1,11 +1,17 @@
 //! Main entrypoint for the client-side graphical application.
 
-use std::{collections::HashSet, ops::Not};
+use std::collections::HashSet;
 
 use macroquad::{
-    audio::Sound, color::{Color, BLUE, GREEN, PURPLE, RED, YELLOW}, input::{get_keys_down, get_keys_pressed, KeyCode}, shapes::draw_rectangle, time::get_frame_time, ui::{root_ui, Skin}, window::{next_frame, screen_height, screen_width}
+    audio::Sound,
+    color::{Color, BLUE, GREEN, PURPLE, RED, YELLOW},
+    input::{get_keys_down, get_keys_pressed, KeyCode},
+    shapes::draw_rectangle,
+    time::get_frame_time,
+    ui::{root_ui, Skin},
+    window::{next_frame, screen_height, screen_width},
 };
-use netcode::{client::Game, State, MAX_UNITS_PER_SECOND};
+use netcode::{client::Game, MAX_UNITS_PER_SECOND};
 use ui::draw_ui;
 
 /// Player's dimentions in x and y axis measured in pixels
@@ -30,9 +36,13 @@ async fn main() -> anyhow::Result<()> {
     let mut game = Game::new();
 
     let font = include_bytes!("../assets/font.ttf");
-    let join_sound = macroquad::audio::load_sound_from_bytes(include_bytes!("../assets/join.wav")).await.unwrap();
-    let ping_sound = macroquad::audio::load_sound_from_bytes(include_bytes!("../assets/ping_pong.wav")).await.unwrap();
-    
+    let join_sound = macroquad::audio::load_sound_from_bytes(include_bytes!("../assets/join.wav"))
+        .await
+        .unwrap();
+    let ping_sound =
+        macroquad::audio::load_sound_from_bytes(include_bytes!("../assets/ping_pong.wav"))
+            .await
+            .unwrap();
 
     let label_style = root_ui()
         .style_builder()
@@ -82,7 +92,7 @@ async fn main() -> anyhow::Result<()> {
     loop {
         draw_ground();
 
-        draw_players(&mut game.display_state);
+        draw_players(&mut game);
 
         handle_keys(&mut game, &join_sound, &ping_sound);
 
@@ -94,12 +104,17 @@ async fn main() -> anyhow::Result<()> {
     }
 }
 
-fn handle_key_press(key_codes: HashSet<KeyCode>, game: &mut Game, join_sound: &Sound, ping_sound: &Sound) {
+fn handle_key_press(
+    key_codes: HashSet<KeyCode>,
+    game: &mut Game,
+    join_sound: &Sound,
+    ping_sound: &Sound,
+) {
     for key in key_codes {
         match key {
             KeyCode::W => match game.player_idx {
                 Some(idx) => {
-                    if let Some(player) = game.display_state.players.get(&idx) {
+                    if let Some(player) = game.local_state.players.get(&idx) {
                         if player.y() <= 0. {
                             game.jump();
                         }
@@ -112,16 +127,6 @@ fn handle_key_press(key_codes: HashSet<KeyCode>, game: &mut Game, join_sound: &S
                     macroquad::audio::play_sound_once(&join_sound);
                     game.join();
                 }
-            }
-            KeyCode::J => {
-                let new_ping = game.ping_cache.checked_sub(10).unwrap_or(0);
-                game.set_simulated_ping(new_ping);
-                macroquad::audio::play_sound_once(ping_sound);
-            }
-            KeyCode::K => {
-                let new_ping = game.ping_cache + 10;
-                game.set_simulated_ping(new_ping);
-                macroquad::audio::play_sound_once(ping_sound);
             }
             KeyCode::P => {
                 game.prediction = !game.prediction;
@@ -137,7 +142,7 @@ fn handle_key_press(key_codes: HashSet<KeyCode>, game: &mut Game, join_sound: &S
                 if !game.prediction {
                     game.prediction = true
                 }
-            },
+            }
             _ => {}
         }
     }
@@ -145,30 +150,40 @@ fn handle_key_press(key_codes: HashSet<KeyCode>, game: &mut Game, join_sound: &S
 
 fn handle_keys(game: &mut Game, join_sound: &Sound, ping_sound: &Sound) {
     let keys_down = get_keys_down();
-    handle_key_hold(keys_down, game);
+    handle_key_hold(keys_down, game, ping_sound);
 
     let keys_pressed = get_keys_pressed();
     handle_key_press(keys_pressed, game, join_sound, ping_sound);
 }
 
-fn handle_key_hold(key_codes: HashSet<KeyCode>, game: &mut Game) {
+fn handle_key_hold(key_codes: HashSet<KeyCode>, game: &mut Game, ping_sound: &Sound) {
     for key in key_codes {
         match key {
             KeyCode::D => game.move_player(MAX_UNITS_PER_SECOND as f32 * get_frame_time()),
             KeyCode::A => game.move_player(-MAX_UNITS_PER_SECOND as f32 * get_frame_time()),
+            KeyCode::J => {
+                let new_ping = game.ping_cache.checked_sub(10).unwrap_or(0);
+                game.set_simulated_ping(new_ping);
+                macroquad::audio::play_sound_once(ping_sound);
+            }
+            KeyCode::K => {
+                let new_ping = game.ping_cache + 10;
+                game.set_simulated_ping(new_ping);
+                macroquad::audio::play_sound_once(ping_sound);
+            }
             _ => {}
         }
     }
 }
 
-fn draw_players(state: &mut State) {
-    for (idx, player) in state.players.iter() {
+fn draw_players(state: &mut Game) {
+    for player in state.display_state.players.values() {
         draw_rectangle(
             player.x as f32 * PIXELS_PER_UNIT,
             (screen_height() * GROUND_HEIGHT) - PLAYER_SIZE - (player.y() as f32 * JUMP_MULTIPLIER),
             PLAYER_SIZE,
             PLAYER_SIZE,
-            PLAYER_COLORS[idx % PLAYER_COLORS.len()],
+            PLAYER_COLORS[player.id % PLAYER_COLORS.len()],
         );
     }
 }

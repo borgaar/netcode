@@ -1,24 +1,13 @@
 //! Handles User Interface interactions such as text and buttons.
 
 use macroquad::{
-    color::Color,
     math::Vec2,
-    text::draw_text,
-    ui::{
-        hash, root_ui,
-        widgets::{Label, Slider},
-        Id, Skin, Style, Ui,
-    },
+    ui::{root_ui, widgets::Label, Skin},
 };
 use netcode::client::Game;
 
 /// Draw the GUI to the canvas
-pub fn draw_ui(
-    game: &mut Game,
-    label_skin: &Skin,
-    active_skin: &Skin,
-    inactive_skin: &Skin,
-) {
+pub fn draw_ui(game: &mut Game, label_skin: &Skin, active_skin: &Skin, inactive_skin: &Skin) {
     let Game {
         interpolation,
         reconciliation,
