@@ -1,3 +1,5 @@
+//! Handles client side state updates with reconciliation, interpolation and prediction.
+
 use std::{
     collections::HashMap,
     sync::{
@@ -17,6 +19,7 @@ use crate::{
     Action, State, ACTION_CHANNEL, ERROR_CHANNEL, JOIN_CHANNEL, STATE_CHANNEL,
 };
 
+/// Game state that is mutated through the lifecycle of the client.
 pub struct Game {
     state_receiver: Receiver<State>,
     join_receiver: Receiver<JoinResponse>,
@@ -40,6 +43,7 @@ impl Default for Game {
 }
 
 impl Game {
+    /// Creates a game state with default values
     pub fn new() -> Self {
         let (state_sender, state_receiver) = channel::<State>();
         let (join_sender, join_receiver) = channel::<JoinResponse>();
@@ -64,6 +68,9 @@ impl Game {
 
         game
     }
+    
+    /// Join the server-side game.
+    /// Make sure to only call this function once, as any future calls result in multiple sessions.
     pub fn join(&self) {
         if let Err(_) = self.client.emit(
             ACTION_CHANNEL,
@@ -72,11 +79,14 @@ impl Game {
             eprintln!("Failed to join the game");
         };
     }
+    
+    /// Tick the game's state. Should be called every frame.
     pub fn update(&mut self) {
         self.state_update();
         self.join_update();
     }
 
+    /// Handles calculating other player's current coordinates based on the current state.
     fn calculate_interpolation_for_frame(&mut self) {
         let prev = self.previous_state.timestamp;
         let target = self.target_state.timestamp;
@@ -122,11 +132,14 @@ impl Game {
         self.display_state.players = new_curr_players;
     }
 
+    /// Get the current player
+    /// May be [None] if no current player (not yet joined)
     fn get_player(&self) -> Option<&Player> {
         let player_id = self.player_idx?;
         self.display_state.players.get(&player_id)
     }
 
+    /// Handles updating the state of an active game.
     fn state_update(&mut self) {
         for server_state in self.state_receiver.try_iter() {
             self.previous_state = self.target_state.clone();
@@ -202,6 +215,7 @@ impl Game {
         self.calculate_interpolation_for_frame();
     }
 
+    /// Get the total delta_x not accounted for by the received server state.
     fn get_unack_x_diff(&self) -> f64 {
         let mut x_diff = 0.0;
         for action in self.unacknowledged.values() {
@@ -215,6 +229,7 @@ impl Game {
         x_diff
     }
 
+    /// Checks if a join response is available to join the game.
     fn join_update(&mut self) {
         for join_response in self.join_receiver.try_iter() {
             self.player_idx = Some(join_response.player_id);
@@ -229,6 +244,7 @@ impl Game {
         }
     }
 
+    /// Make the current player jump.
     pub fn jump(&mut self) {
         if let Some(player_idx) = self.player_idx {
             // Optimistic update
@@ -258,6 +274,8 @@ impl Game {
             });
         }
     }
+    
+    /// Makes the current player move by [delta_x] units
     pub fn move_player(&mut self, delta_x: f32) {
         let Some(player_idx) = self.player_idx else {
             return;
@@ -267,6 +285,7 @@ impl Game {
         self.display_state.players.get_mut(&player_idx).unwrap().x += delta_x as f64;
     }
 
+    /// Update the game's simulated ping amount to check for network issues.
     pub fn set_simulated_ping(&self, new_ping: u64) -> u64 {
         let mut ping = self.simulated_ping.lock().unwrap();
         *ping = new_ping;
@@ -274,6 +293,7 @@ impl Game {
     }
 }
 
+/// Build a client to handle incomming messages from the server.
 fn build_netcode_client(
     state_sender: Sender<State>,
     join_sender: Sender<JoinResponse>,
@@ -338,12 +358,6 @@ fn build_netcode_client(
 }
 
 /// Linear interpolation between two values
-///
-/// * `a` - The start value
-/// * `b` - The end value
-/// * `t` - The interpolation factor (between 0.0 and 1.0)
-///
-/// Returns the interpolated value: a + t * (b - a)
 pub fn lerp(a: f64, b: f64, t: f64) -> f64 {
     a + t * (b - a)
 }

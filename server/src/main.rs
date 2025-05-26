@@ -1,3 +1,5 @@
+//! Main entrypoint for the server-side SocketIO API.
+
 use netcode::{event::JoinResponse, ACTION_CHANNEL, ERROR_CHANNEL, JOIN_CHANNEL, STATE_CHANNEL};
 use socketioxide::{
     extract::{Data, SocketRef, State},
@@ -12,7 +14,7 @@ use std::{
 /// Time between each tick update on the server's state
 const STATE_UPDATE_INTERVAL: Duration = Duration::from_millis(250);
 
-/// Handles socket connections
+/// Handles incoming socket connections from clients
 async fn on_connect(socket: SocketRef, State(state): State<Arc<AppState>>) {
     let state = &state.state;
     let user_id = Arc::new(Mutex::new(0));
@@ -81,12 +83,14 @@ async fn on_connect(socket: SocketRef, State(state): State<Arc<AppState>>) {
     });
 }
 
+/// Tries applying a state action; sends a message to the error channel if it fails, without blocking the thread.
 fn try_action(result: Result<(), netcode::state::StateError>, socket: SocketRef) {
     if let Err(e) = result {
         tokio::spawn(socket.local().emit(ERROR_CHANNEL, &e.to_string()));
     }
 }
 
+/// Global game state that can be cloned into multiple handles across threads.
 #[derive(Debug, Clone, Default)]
 struct AppState {
     state: Arc<Mutex<netcode::State>>,
@@ -112,7 +116,7 @@ async fn main() -> anyhow::Result<()> {
     Ok(())
 }
 
-// Alternative: Broadcast to specific namespace
+// Starts broadcasting the state periodically to all clients to synchronize the game state.
 fn start_periodic_broadcast_to_namespace(io: SocketIo, state: Arc<AppState>) {
     tokio::spawn(async move {
         let mut interval = tokio::time::interval(STATE_UPDATE_INTERVAL);

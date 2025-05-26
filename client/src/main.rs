@@ -1,3 +1,5 @@
+//! Main entrypoint for the client-side graphical application.
+
 use std::{collections::HashSet, ops::Not};
 
 use macroquad::{
@@ -6,10 +8,19 @@ use macroquad::{
 use netcode::{client::Game, State, MAX_UNITS_PER_SECOND};
 use ui::draw_ui;
 
+/// Player's dimentions in x and y axis measured in pixels
 const PLAYER_SIZE: f32 = 30.;
+
+/// Height of the ground on screen
 const GROUND_HEIGHT: f32 = 0.8;
+
+/// Multiplier for jump velocity
 const JUMP_MULTIPLIER: f32 = 300.;
+
+/// All possible colors for players. Cycled through as more players join in.
 const PLAYER_COLORS: [Color; 5] = [RED, GREEN, BLUE, YELLOW, PURPLE];
+
+/// Number of pixels per server-side units. Used for rendering.
 const PIXELS_PER_UNIT: f32 = 40.;
 
 mod ui;

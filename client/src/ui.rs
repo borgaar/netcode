@@ -1,3 +1,5 @@
+//! Handles User Interface interactions such as text and buttons.
+
 use macroquad::{
     color::Color,
     math::Vec2,
@@ -10,6 +12,7 @@ use macroquad::{
 };
 use netcode::client::Game;
 
+/// Draw the GUI to the canvas
 pub fn draw_ui(
     game: &mut Game,
     label_skin: &Skin,
@@ -46,6 +49,8 @@ pub fn draw_ui(
         .ui(&mut root_ui());
 }
 
+/// Changes the game's skin to apply some styling based on a condition.
+/// Removes the current skin before pushing the replacement.
 fn change_style(condition: bool, active_skin: &Skin, inactive_skin: &Skin) {
     root_ui().pop_skin();
 
