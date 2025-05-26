@@ -90,11 +90,13 @@ impl Game {
 
     /// Handles calculating other player's current coordinates based on the current state.
     fn calculate_interpolation_for_frame(&mut self) {
+        // Find time the lerping value, t, for interpolation using previously obtained states
         let prev = self.previous_state.timestamp;
         let target = self.target_state.timestamp;
         let curr = Utc::now() - TimeDelta::milliseconds((self.ping_cache / 2) as i64);
         let t = (curr - target).as_seconds_f64() / (target - prev).as_seconds_f64();
 
+        // Due to prediction and reconciliation we will handle own player differently
         let player_id = self.player_idx.unwrap_or(usize::MAX);
 
         let self_player = self
@@ -118,6 +120,8 @@ impl Game {
                     .get(&tar_player_id)
                     .unwrap_or_else(|| tar_player);
 
+                // Find x value based on linear interpolation between previous and target player
+                // positions
                 let x = lerp(prev_player.x, tar_player.x, t);
 
                 return (
@@ -131,11 +135,13 @@ impl Game {
             })
             .collect::<HashMap<_, _>>();
 
+        // Update position on working local state
         self.local_state.players = new_curr_players.clone();
-        let display_player = self.display_state.players.get(&player_id);
-        if let Some(display_player) = display_player {
+        if let Some(display_player) = self.display_state.players.get(&player_id) {
+            // Add the current reconciled/predicted player's position to the list of lerped players
             new_curr_players.insert(player_id, display_player.clone());
         }
+        // Update the display state with the new lerped players
         self.display_state.players = new_curr_players;
     }
 
@@ -152,7 +158,7 @@ impl Game {
             self.previous_state = self.target_state.clone();
             self.target_state = server_state.clone();
 
-            // Update ping
+            // Update ping cache
             {
                 self.ping_cache = self.simulated_ping.lock().unwrap().clone();
             }
@@ -161,9 +167,9 @@ impl Game {
             let current_player = match self.get_player() {
                 Some(player) => player.clone(),
                 None => {
-                    // Update display state and continue
+                    // Update local and display state and continue
                     self.local_state = server_state.clone();
-                    self.display_state = self.local_state.clone();
+                    self.display_state = server_state;
                     continue;
                 }
             };
@@ -191,7 +197,7 @@ impl Game {
                 .last_jump_at
                 .unwrap_or_else(|| Utc::now() - TimeDelta::milliseconds(1000));
 
-            // Update the local state with the state from the server
+            // Update the local and display state with the state from the server
             self.local_state = server_state.clone();
             self.display_state = self.previous_state.clone();
 
@@ -199,6 +205,7 @@ impl Game {
             if let Some(player) = self.local_state.players.get_mut(&current_player.id) {
                 player.x = reconciled_position + position_discrepancy;
                 player.last_jump_at = Some(local_last_jump_at);
+
                 if self.reconciliation {
                     if let Some(display_player) =
                         self.display_state.players.get_mut(&current_player.id)

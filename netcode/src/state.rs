@@ -120,7 +120,7 @@ impl Player {
     pub fn new(id: usize) -> Self {
         Self {
             id,
-            x: 0.0,
+            x: 10.0,
             last_jump_at: None,
         }
     }
