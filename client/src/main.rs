@@ -4,7 +4,7 @@ use std::collections::HashSet;
 
 use macroquad::{
     audio::Sound,
-    color::{Color, BLUE, GREEN, PURPLE, RED, YELLOW},
+    color::{Color, BLUE, BROWN, GREEN, PURPLE, RED, YELLOW},
     input::{get_keys_down, get_keys_pressed, KeyCode},
     shapes::draw_rectangle,
     time::get_frame_time,
@@ -189,6 +189,6 @@ fn draw_ground() {
         screen_height() * GROUND_HEIGHT,
         screen_width(),
         screen_height(),
-        BLUE,
+        BROWN,
     );
 }
