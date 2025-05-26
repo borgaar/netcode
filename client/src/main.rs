@@ -19,7 +19,6 @@ async fn main() -> anyhow::Result<()> {
     let mut game = Game::new();
 
     let font = include_bytes!("../assets/font.ttf");
-    let sound = macroquad::audio::load_sound_from_bytes(include_bytes!("../assets/magic.wav")).await.unwrap();
     let join_sound = macroquad::audio::load_sound_from_bytes(include_bytes!("../assets/join.wav")).await.unwrap();
     let ping_sound = macroquad::audio::load_sound_from_bytes(include_bytes!("../assets/ping_pong.wav")).await.unwrap();
     
@@ -74,7 +73,7 @@ async fn main() -> anyhow::Result<()> {
 
         draw_players(&mut game.display_state);
 
-        handle_keys(&mut game, &sound, &join_sound, &ping_sound);
+        handle_keys(&mut game, &join_sound, &ping_sound);
 
         draw_ui(&mut game, &label_skin, &active_skin, &inactive_skin);
 
@@ -84,7 +83,7 @@ async fn main() -> anyhow::Result<()> {
     }
 }
 
-fn handle_key_press(key_codes: HashSet<KeyCode>, game: &mut Game, sound: &Sound, join_sound: &Sound, ping_sound: &Sound) {
+fn handle_key_press(key_codes: HashSet<KeyCode>, game: &mut Game, join_sound: &Sound, ping_sound: &Sound) {
     for key in key_codes {
         match key {
             KeyCode::W => match game.player_idx {
@@ -128,20 +127,17 @@ fn handle_key_press(key_codes: HashSet<KeyCode>, game: &mut Game, sound: &Sound,
                     game.prediction = true
                 }
             },
-            KeyCode::Q => {
-                macroquad::audio::play_sound_once(sound);
-            }
             _ => {}
         }
     }
 }
 
-fn handle_keys(game: &mut Game, sound: &Sound, join_sound: &Sound, ping_sound: &Sound) {
+fn handle_keys(game: &mut Game, join_sound: &Sound, ping_sound: &Sound) {
     let keys_down = get_keys_down();
     handle_key_hold(keys_down, game);
 
     let keys_pressed = get_keys_pressed();
-    handle_key_press(keys_pressed, game, sound, join_sound, ping_sound);
+    handle_key_press(keys_pressed, game, join_sound, ping_sound);
 }
 
 fn handle_key_hold(key_codes: HashSet<KeyCode>, game: &mut Game) {
