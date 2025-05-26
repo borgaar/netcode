@@ -11,15 +11,14 @@ The game consists of a client side application written in Rust with the Macroqua
 
 - Graphical client-side game with movement and jumping
 - Toggleable netcode functionality, namely interpolation, reconciliation and prediction
-- Adjustable ping that is simulated on the client
+- Adjustable ping that is simulated on the client for both sending and receiving packets.
 - Sound effects for joining the game and adjusting ping
-- Server-side application that provides a SocketIO API, and can handle multiple client connections simulatneously
+- Server-side application that provides a SocketIO API, and can handle multiple client connections simultaneously
 
 ## Roadmap/weaknesses
 
-- Physics simulation; currently has constant movement speed in the X axis and virtual jumping based on formula/time
+- Physics simulation; currently has constant movement speed in the X axis and virtual and jumping where height is calculated based on the time of the jump.
 - Collisions; currently no collisions. Contact with ground based solely on min Y coordinates
--
 
 ## Dependencies
 
@@ -57,16 +56,35 @@ The latest stable release should suffice.
 1. Run the server
 
 ```sh
-cd server && cargo run --release
+cargo run --release --bin server
 ```
 
-2. Run the client
+2. Run the client (must run the server first)
 
 ```sh
-cd client && cargo run --release
+cargo run --release --bin client
 ```
 
-You can omit the releas flag to compile in debug mode.
+You can omit the release flag to compile in debug mode, but this might affect performance.
+
+## How to use
+
+### Keybinds
+
+- `Space` - Join the game
+- `W` - Jump
+- `A` - Move left
+- `D` - Move right
+- `J` - Reduce ping
+- `K` - Increase ping
+- `I` - Toggle interpolation
+- `R` - Toggle reconciliation
+- `P` - Toggle prediction
+
+### Adjust server update rate
+
+The server's update rate can be changed by increasing or decreasing the `STATE_UPDATE_INTERVAL` constant at the top of the `server/src/main.rs` file, and restarting the server.
+This constant represents how many milliseconds the server waits before sending a new state update to the clients. It is recommended to keep this value above 15ms.
 
 ## Running tests
 
@@ -75,3 +93,4 @@ Tests can be run with
 ```sh
 cargo test
 ```
+
