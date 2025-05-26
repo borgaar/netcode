@@ -6,7 +6,7 @@ use std::{
         mpsc::{channel, Receiver, Sender},
         Arc, Mutex,
     },
-    thread, usize,
+    thread,
 };
 
 use chrono::{TimeDelta, Utc};
@@ -51,7 +51,7 @@ impl Game {
 
         let simulated_ping = Arc::new(Mutex::new(250));
 
-        let game = Self {
+        Self {
             state_receiver,
             join_receiver,
             unacknowledged: HashMap::new(),
@@ -66,18 +66,20 @@ impl Game {
             prediction: true,
             reconciliation: true,
             interpolation: true,
-        };
-
-        game
+        }
     }
 
     /// Join the server-side game.
     /// Make sure to only call this function once, as any future calls result in multiple sessions.
     pub fn join(&self) {
-        if let Err(_) = self.client.emit(
-            ACTION_CHANNEL,
-            Payload::Text(vec![serde_json::to_value(&Action::Join).unwrap()]),
-        ) {
+        if self
+            .client
+            .emit(
+                ACTION_CHANNEL,
+                Payload::Text(vec![serde_json::to_value(&Action::Join).unwrap()]),
+            )
+            .is_err()
+        {
             eprintln!("Failed to join the game");
         };
     }
@@ -110,28 +112,30 @@ impl Game {
             .players
             .iter()
             .map(|(tar_player_id, tar_player)| {
-                if *tar_player_id == player_id && self_player.is_some() {
-                    return (*tar_player_id, self_player.unwrap().clone());
+                if *tar_player_id == player_id {
+                    if let Some(self_player) = self_player {
+                        return (*tar_player_id, self_player.clone());
+                    }
                 }
 
                 let prev_player = self
                     .previous_state
                     .players
-                    .get(&tar_player_id)
-                    .unwrap_or_else(|| tar_player);
+                    .get(tar_player_id)
+                    .unwrap_or(tar_player);
 
                 // Find x value based on linear interpolation between previous and target player
                 // positions
                 let x = lerp(prev_player.x, tar_player.x, t);
 
-                return (
+                (
                     *tar_player_id,
                     Player {
                         id: *tar_player_id,
                         x,
                         last_jump_at: tar_player.last_jump_at,
                     },
-                );
+                )
             })
             .collect::<HashMap<_, _>>();
 
@@ -160,7 +164,7 @@ impl Game {
 
             // Update ping cache
             {
-                self.ping_cache = self.simulated_ping.lock().unwrap().clone();
+                self.ping_cache = *self.simulated_ping.lock().unwrap();
             }
 
             // Get the current player
@@ -176,7 +180,7 @@ impl Game {
 
             // Remove acknowledged actions
             self.unacknowledged
-                .retain(|key, _| server_state.acknowledged.get(key).is_none());
+                .retain(|key, _| !server_state.acknowledged.contains(key));
 
             // Get the unacknowledged diff from the last update
             let unacknowledged_x_diff = self.get_unack_x_diff();

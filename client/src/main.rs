@@ -109,19 +109,18 @@ async fn main() -> anyhow::Result<()> {
 fn handle_key_press(key_codes: HashSet<KeyCode>, game: &mut Game, join_sound: &Sound) {
     for key in key_codes {
         match key {
-            KeyCode::W => match game.player_idx {
-                Some(idx) => {
+            KeyCode::W => {
+                if let Some(idx) = game.player_idx {
                     if let Some(player) = game.local_state.players.get(&idx) {
                         if player.y() <= 0. {
                             game.jump();
                         }
                     }
                 }
-                None => {}
-            },
+            }
             KeyCode::Space => {
-                if let None = game.player_idx {
-                    macroquad::audio::play_sound_once(&join_sound);
+                if game.player_idx.is_none() {
+                    macroquad::audio::play_sound_once(join_sound);
                     game.join();
                 }
             }
@@ -159,7 +158,7 @@ fn handle_key_hold(key_codes: HashSet<KeyCode>, game: &mut Game, ping_sound: &So
             KeyCode::D => game.move_player(MAX_UNITS_PER_SECOND as f32 * get_frame_time()),
             KeyCode::A => game.move_player(-MAX_UNITS_PER_SECOND as f32 * get_frame_time()),
             KeyCode::J => {
-                let new_ping = game.ping_cache.checked_sub(10).unwrap_or(0);
+                let new_ping = game.ping_cache.saturating_sub(10);
                 game.set_simulated_ping(new_ping);
                 macroquad::audio::play_sound_once(ping_sound);
             }

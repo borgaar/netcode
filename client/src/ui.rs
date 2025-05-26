@@ -16,7 +16,7 @@ pub fn draw_ui(game: &mut Game, label_skin: &Skin, active_skin: &Skin, inactive_
     } = game;
 
     root_ui().pop_skin();
-    root_ui().push_skin(&label_skin);
+    root_ui().push_skin(label_skin);
 
     Label::new(format!("Ping {:?}ms", game.ping_cache))
         .position(Vec2 { x: 15., y: 15. })
@@ -27,17 +27,17 @@ pub fn draw_ui(game: &mut Game, label_skin: &Skin, active_skin: &Skin, inactive_
         .ui(&mut root_ui());
 
     change_style(*prediction, active_skin, inactive_skin);
-    Label::new(format!("Prediction"))
+    Label::new("Prediction".to_string())
         .position(Vec2 { x: 200., y: 15. })
         .ui(&mut root_ui());
 
     change_style(*reconciliation, active_skin, inactive_skin);
-    Label::new(format!("Reconciliation"))
+    Label::new("Reconciliation".to_string())
         .position(Vec2 { x: 350., y: 15. })
         .ui(&mut root_ui());
 
     change_style(*interpolation, active_skin, inactive_skin);
-    Label::new(format!("Interpolation"))
+    Label::new("Interpolation".to_string())
         .position(Vec2 { x: 550., y: 15. })
         .ui(&mut root_ui());
 }
@@ -53,5 +53,5 @@ fn change_style(condition: bool, active_skin: &Skin, inactive_skin: &Skin) {
         inactive_skin
     };
 
-    root_ui().push_skin(&skin);
+    root_ui().push_skin(skin);
 }
