@@ -20,7 +20,7 @@ impl Action {
         match self {
             Action::Join => None,
             Action::Player { action, id: _ } => match action {
-                PlayerAction::Jump { at } => None,
+                PlayerAction::Jump { at: _ } => None,
                 PlayerAction::Move { delta_x, id } => Some((
                     *id,
                     PlayerAction::Move {

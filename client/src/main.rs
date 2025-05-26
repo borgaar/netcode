@@ -104,12 +104,7 @@ async fn main() -> anyhow::Result<()> {
     }
 }
 
-fn handle_key_press(
-    key_codes: HashSet<KeyCode>,
-    game: &mut Game,
-    join_sound: &Sound,
-    ping_sound: &Sound,
-) {
+fn handle_key_press(key_codes: HashSet<KeyCode>, game: &mut Game, join_sound: &Sound) {
     for key in key_codes {
         match key {
             KeyCode::W => match game.player_idx {
@@ -153,7 +148,7 @@ fn handle_keys(game: &mut Game, join_sound: &Sound, ping_sound: &Sound) {
     handle_key_hold(keys_down, game, ping_sound);
 
     let keys_pressed = get_keys_pressed();
-    handle_key_press(keys_pressed, game, join_sound, ping_sound);
+    handle_key_press(keys_pressed, game, join_sound);
 }
 
 fn handle_key_hold(key_codes: HashSet<KeyCode>, game: &mut Game, ping_sound: &Sound) {
